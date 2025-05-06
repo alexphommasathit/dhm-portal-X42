@@ -1,45 +1,41 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server';
+import { createServerActionClient } from '@/lib/supabase/server';
+// cookies import is NOT needed if only calling supabase client methods
+// import { cookies } from 'next/headers';
 
-export const dynamic = 'force-dynamic'
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
-  const requestUrl = new URL(request.url)
-  const token = requestUrl.searchParams.get('token')
-  const type = requestUrl.searchParams.get('type')
-  
-  // Validate we have the required parameters
-  if (!token || type !== 'recovery') {
-    return NextResponse.redirect(
-      `${requestUrl.origin}/auth-error?code=${encodeURIComponent('INVALID_REQUEST')}&message=${encodeURIComponent('Invalid password reset request')}`
-    )
+  const requestUrl = new URL(request.url);
+  const code = requestUrl.searchParams.get('code');
+
+  if (!code) {
+    // Handle missing code
+    console.warn('Missing code in reset password callback');
+    return NextResponse.redirect(new URL('/auth/error', requestUrl.origin));
   }
-  
+
   try {
-    const cookieStore = cookies()
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
-    
-    // Process the recovery token
-    const { error } = await supabase.auth.verifyOtp({
-      token_hash: token,
-      type: 'recovery',
-    })
-    
+    // Initialize Supabase client using the consistent helper
+    // No need for cookies() here, createServerActionClient handles it
+    const supabase = createServerActionClient();
+
+    // Exchange the code for a session
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+
     if (error) {
-      console.error('Error verifying recovery token:', error)
-      return NextResponse.redirect(
-        `${requestUrl.origin}/auth-error?code=${encodeURIComponent(error.code || 'VERIFY_ERROR')}&message=${encodeURIComponent(error.message)}`
-      )
+      // Handle exchange error
+      console.error('Error exchanging code for session (reset password):', error);
+      return NextResponse.redirect(new URL('/auth/error', requestUrl.origin));
     }
-    
-    // Redirect to the password reset form
-    return NextResponse.redirect(`${requestUrl.origin}/reset-password?verified=true`)
+
+    // Redirect the user to the password update page
+    // Important: Supabase handles setting the session cookie via the client
+    return NextResponse.redirect(new URL('/auth/reset-password', requestUrl.origin));
   } catch (error: any) {
-    console.error('Unexpected error processing recovery:', error)
-    return NextResponse.redirect(
-      `${requestUrl.origin}/auth-error?code=${encodeURIComponent('INTERNAL_ERROR')}&message=${encodeURIComponent(error.message || 'An unexpected error occurred')}`
-    )
+    console.error('Unexpected error processing recovery:', error);
+    return NextResponse.redirect(new URL('/auth/error', requestUrl.origin));
   }
-} 
+}
+
+// Remove the incorrectly added POST handler

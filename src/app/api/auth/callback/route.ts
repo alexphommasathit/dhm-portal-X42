@@ -1,59 +1,81 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
-import { NextResponse } from 'next/server'
-import type { NextRequest } from 'next/server'
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+import { createMiddlewareSupabase } from '@/lib/supabase/server';
 
-export const dynamic = 'force-dynamic'
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
-  const requestUrl = new URL(request.url)
-  const code = requestUrl.searchParams.get('code')
-  const error = requestUrl.searchParams.get('error')
-  const errorDescription = requestUrl.searchParams.get('error_description')
-  
-  // Get the redirect path from the query parameters
-  const redirectTo = requestUrl.searchParams.get('redirect_to')
-
-  // Handle error cases from OAuth providers
-  if (error) {
-    console.error('Auth callback error:', error, errorDescription);
-    return NextResponse.redirect(
-      `${requestUrl.origin}/auth-error?code=${encodeURIComponent(error)}&message=${encodeURIComponent(errorDescription || 'Authentication failed')}`
-    )
-  }
+  const requestUrl = new URL(request.url);
+  const code = requestUrl.searchParams.get('code');
 
   if (!code) {
-    console.error('Auth callback missing code parameter');
-    return NextResponse.redirect(
-      `${requestUrl.origin}/auth-error?code=${encodeURIComponent('MISSING_CODE')}&message=${encodeURIComponent('Authentication code is missing')}`
-    )
+    console.warn('No code provided in auth callback');
+    return NextResponse.redirect(new URL('/auth/login', request.url));
   }
 
   try {
-    const cookieStore = cookies()
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
-    
+    // Create a response to update cookies on
+    const response = NextResponse.redirect(new URL('/', request.url));
+
+    // First, clean any existing problematic cookies
+    const cookiesToRemove = ['sb-access-token', 'sb-refresh-token', 'based-eyJ'];
+    cookiesToRemove.forEach(cookieName => {
+      response.cookies.delete({
+        name: cookieName,
+        path: '/',
+      });
+    });
+
+    // Create supabase client with the response to set cookies
+    const supabase = createMiddlewareSupabase(request, response);
+
     // Exchange the code for a session
-    const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
-    
-    if (exchangeError) {
-      console.error('Error exchanging code for session:', exchangeError)
+    const { error } = await supabase.auth.exchangeCodeForSession(code);
+
+    if (error) {
+      console.error('Error exchanging code for session:', error);
+
+      // Clean up any problematic cookies
+      const cookiesToClean = [
+        'sb-access-token',
+        'sb-refresh-token',
+        'based-eyJ',
+        '__supabase_auth_token',
+        '_supabase_session',
+      ];
+
+      cookiesToClean.forEach(cookieName => {
+        response.cookies.delete({
+          name: cookieName,
+          path: '/',
+        });
+      });
+
       return NextResponse.redirect(
-        `${requestUrl.origin}/auth-error?code=${encodeURIComponent(exchangeError.code || 'SESSION_ERROR')}&message=${encodeURIComponent(exchangeError.message)}`
-      )
+        new URL(
+          `/auth/error?code=${encodeURIComponent(
+            error.code || 'unknown'
+          )}&message=${encodeURIComponent(error.message)}`,
+          request.url
+        )
+      );
     }
-    
-    // Log the successful authentication and redirect destination
-    console.log('Authentication successful, redirecting to:', redirectTo || '/')
-    
-    // Redirect to the specified path or home page on success
-    // Decode the redirectTo parameter if it exists
-    const targetPath = redirectTo ? decodeURIComponent(redirectTo) : '/'
-    return NextResponse.redirect(`${requestUrl.origin}${targetPath}`)
-  } catch (error: any) {
-    console.error('Unexpected error in auth callback:', error)
+
+    // Get redirect path from URL (if any)
+    const redirectTo = requestUrl.searchParams.get('redirect_to') || '/';
+
+    // Update the redirect URL in the response
+    return NextResponse.redirect(new URL(redirectTo, request.url));
+  } catch (error) {
+    console.error('Unexpected error in auth callback:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
+    // Return a redirect to the error page
     return NextResponse.redirect(
-      `${requestUrl.origin}/auth-error?code=${encodeURIComponent('INTERNAL_ERROR')}&message=${encodeURIComponent(error.message || 'An unexpected error occurred')}`
-    )
+      new URL(
+        `/auth/error?code=unexpected&message=${encodeURIComponent(errorMessage)}`,
+        request.url
+      )
+    );
   }
-} 
+}

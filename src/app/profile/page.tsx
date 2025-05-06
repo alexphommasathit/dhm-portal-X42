@@ -1,29 +1,30 @@
-'use client'
+'use client';
 
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
-import { useAuth } from '@/context/AuthContext'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import type { Database } from '@/types/supabase'
-import Link from 'next/link'
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
+import { createClientComponentSupabase } from '@/lib/supabase/client';
+import type { Database } from '@/types/supabase';
+import Link from 'next/link';
 
-type Role = Database['public']['Enums']['user_role']
-type Profile = Database['public']['Tables']['profiles']['Row']
+type Role = Database['public']['Enums']['user_role'];
+type Profile = Database['public']['Tables']['profiles']['Row'];
 
 export default function ProfilePage() {
-  const { user, profile, loading, refreshProfile } = useAuth()
-  const router = useRouter()
-  
+  const { user, profile, loading, refreshProfile } = useAuth();
+  const router = useRouter();
+
   // Form state
-  const [firstName, setFirstName] = useState<string>('')
-  const [lastName, setLastName] = useState<string>('')
-  const [userRole, setUserRole] = useState<Role>('unassigned')
-  const [isLoading, setIsLoading] = useState(false)
-  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
-  const [isEditing, setIsEditing] = useState(false)
-  
-  const supabase = createClientComponentClient<Database>()
-  
+  const [firstName, setFirstName] = useState<string>('');
+  const [lastName, setLastName] = useState<string>('');
+  const [userRole, setUserRole] = useState<Role>('unassigned');
+  const [isLoading, setIsLoading] = useState(false);
+  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+
+  // Use the correct client helper
+  const supabase = createClientComponentSupabase();
+
   // Role options from the user_role enum type
   const roleOptions: Role[] = [
     'financial_admin',
@@ -36,9 +37,9 @@ export default function ProfilePage() {
     'family_caregiver',
     'case_manager',
     'referral_source',
-    'unassigned'
-  ]
-  
+    'unassigned',
+  ];
+
   // Role display names for better readability
   const roleDisplayNames: Record<Role, string> = {
     financial_admin: 'Financial Admin',
@@ -51,86 +52,83 @@ export default function ProfilePage() {
     family_caregiver: 'Family Caregiver',
     case_manager: 'Case Manager',
     referral_source: 'Referral Source',
-    unassigned: 'Unassigned'
-  }
+    unassigned: 'Unassigned',
+  };
 
   // Update form state when profile data is loaded
   useEffect(() => {
     if (profile) {
-      setFirstName(profile.first_name || '')
-      setLastName(profile.last_name || '')
-      setUserRole(profile.role)
+      setFirstName(profile.first_name || '');
+      setLastName(profile.last_name || '');
+      setUserRole(profile.role);
     }
-  }, [profile])
+  }, [profile]);
 
   // Redirect to login if not authenticated
   useEffect(() => {
     if (!loading && !user) {
-      router.push('/login')
+      router.push('/auth/login');
     }
-  }, [user, loading, router])
-  
+  }, [user, loading, router]);
+
   // Handle form submission
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
+    e.preventDefault();
+
     if (!user) {
-      setMessage({ 
-        type: 'error', 
-        text: 'You must be logged in to update your profile'
-      })
-      return
+      setMessage({
+        type: 'error',
+        text: 'You must be logged in to update your profile',
+      });
+      return;
     }
-    
-    setIsLoading(true)
-    setMessage(null)
-    
+
+    setIsLoading(true);
+    setMessage(null);
+
     try {
       const { error } = await supabase
         .from('profiles')
         .update({
           first_name: firstName,
           last_name: lastName,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
-        .eq('id', user.id)
-      
+        .eq('id', user.id);
+
       if (error) {
-        throw error
+        throw error;
       }
-      
+
       // Success message
       setMessage({
         type: 'success',
-        text: 'Profile updated successfully!'
-      })
-      
+        text: 'Profile updated successfully!',
+      });
+
       // Refresh profile in the auth context
-      await refreshProfile()
-      
+      await refreshProfile();
+
       // Exit edit mode
-      setIsEditing(false)
+      setIsEditing(false);
     } catch (error: any) {
-      console.error('Error updating profile:', error)
+      console.error('Error updating profile:', error);
       setMessage({
         type: 'error',
-        text: error.message || 'Failed to update profile'
-      })
+        text: error.message || 'Failed to update profile',
+      });
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
-  
+  };
+
   // Check if the form has changes compared to the current profile
   const hasChanges = () => {
-    if (!profile) return false
-    
-    return (
-      firstName !== (profile.first_name || '') ||
-      lastName !== (profile.last_name || '')
-    )
-  }
-  
+    if (!profile) return false;
+
+    return firstName !== (profile.first_name || '') || lastName !== (profile.last_name || '');
+  };
+
   // If still loading the user's data
   if (loading) {
     return (
@@ -147,9 +145,9 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
-    )
+    );
   }
-  
+
   // If user is not logged in
   if (!user) {
     return (
@@ -161,8 +159,8 @@ export default function ProfilePage() {
               You need to be logged in to view your profile.
             </p>
             <div className="flex justify-center">
-              <Link 
-                href="/login" 
+              <Link
+                href="/auth/login"
                 className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
               >
                 Go to Login
@@ -171,9 +169,9 @@ export default function ProfilePage() {
           </div>
         </div>
       </div>
-    )
+    );
   }
-  
+
   return (
     <div className="min-h-screen py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md mx-auto bg-white rounded-lg shadow overflow-hidden">
@@ -189,25 +187,20 @@ export default function ProfilePage() {
               </button>
             )}
           </div>
-          
+
           {message && (
-            <div 
+            <div
               className={`p-4 mb-4 rounded ${
-                message.type === 'success' 
-                  ? 'bg-green-50 text-green-700' 
-                  : 'bg-red-50 text-red-700'
+                message.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
               }`}
             >
               {message.text}
-              <button 
-                onClick={() => setMessage(null)}
-                className="ml-2 text-sm underline"
-              >
+              <button onClick={() => setMessage(null)} className="ml-2 text-sm underline">
                 Dismiss
               </button>
             </div>
           )}
-          
+
           {isEditing ? (
             // Edit mode - show the form
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -224,20 +217,23 @@ export default function ProfilePage() {
                 />
                 <p className="mt-1 text-xs text-gray-500">Email cannot be changed here</p>
               </div>
-              
+
               <div>
-                <label htmlFor="first_name" className="block text-sm font-medium text-gray-700 mb-1">
+                <label
+                  htmlFor="first_name"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
                   First Name
                 </label>
                 <input
                   type="text"
                   id="first_name"
                   value={firstName}
-                  onChange={(e) => setFirstName(e.target.value)}
+                  onChange={e => setFirstName(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
-              
+
               <div>
                 <label htmlFor="last_name" className="block text-sm font-medium text-gray-700 mb-1">
                   Last Name
@@ -246,11 +242,11 @@ export default function ProfilePage() {
                   type="text"
                   id="last_name"
                   value={lastName}
-                  onChange={(e) => setLastName(e.target.value)}
+                  onChange={e => setLastName(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
-              
+
               <div>
                 <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-1">
                   Role
@@ -258,18 +254,20 @@ export default function ProfilePage() {
                 <div className="px-3 py-2 border border-gray-300 rounded-md bg-gray-100">
                   {roleDisplayNames[userRole]}
                 </div>
-                <p className="mt-1 text-xs text-gray-500">Role assignment is managed by administrators</p>
+                <p className="mt-1 text-xs text-gray-500">
+                  Role assignment is managed by administrators
+                </p>
               </div>
-              
+
               <div className="flex justify-end space-x-3 pt-4">
                 <button
                   type="button"
                   onClick={() => {
-                    setIsEditing(false)
+                    setIsEditing(false);
                     // Reset form to original profile values
                     if (profile) {
-                      setFirstName(profile.first_name || '')
-                      setLastName(profile.last_name || '')
+                      setFirstName(profile.first_name || '');
+                      setLastName(profile.last_name || '');
                     }
                   }}
                   className="px-4 py-2 border border-gray-300 text-gray-700 rounded hover:bg-gray-50"
@@ -277,7 +275,7 @@ export default function ProfilePage() {
                 >
                   Cancel
                 </button>
-                
+
                 <button
                   type="submit"
                   className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-blue-300"
@@ -294,25 +292,25 @@ export default function ProfilePage() {
                 <h3 className="text-sm font-medium text-gray-500">Email</h3>
                 <p className="mt-1">{user.email}</p>
               </div>
-              
+
               <div>
                 <h3 className="text-sm font-medium text-gray-500">First Name</h3>
                 <p className="mt-1">{profile?.first_name || 'Not set'}</p>
               </div>
-              
+
               <div>
                 <h3 className="text-sm font-medium text-gray-500">Last Name</h3>
                 <p className="mt-1">{profile?.last_name || 'Not set'}</p>
               </div>
-              
+
               <div>
                 <h3 className="text-sm font-medium text-gray-500">Role</h3>
                 <p className="mt-1">{roleDisplayNames[profile?.role || 'unassigned']}</p>
               </div>
-              
+
               <div className="pt-4">
                 <Link
-                  href="/reset-password"
+                  href="/auth/reset-password"
                   className="text-sm text-blue-600 hover:text-blue-800"
                 >
                   Change your password
@@ -321,7 +319,7 @@ export default function ProfilePage() {
             </div>
           )}
         </div>
-        
+
         <div className="px-6 py-4 bg-gray-50">
           <Link href="/" className="text-sm text-blue-600 hover:text-blue-800">
             &larr; Back to Home
@@ -329,5 +327,5 @@ export default function ProfilePage() {
         </div>
       </div>
     </div>
-  )
-} 
+  );
+}

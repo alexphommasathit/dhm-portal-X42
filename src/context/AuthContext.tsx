@@ -1,22 +1,30 @@
-'use client'
+'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react'
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import type { User, Session } from '@supabase/supabase-js'
-import type { Database } from '../types/supabase'
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+  useCallback,
+} from 'react';
+import type { User, Session } from '@supabase/supabase-js';
+import type { Database } from '../types/supabase';
+import { createClientComponentSupabase } from '@/lib/supabase/client';
+import { logoutUser } from '@/app/actions';
 
-type Profile = Database['public']['Tables']['profiles']['Row']
+type Profile = Database['public']['Tables']['profiles']['Row'];
 
 interface AuthContextType {
-  user: User | null
-  session: Session | null
-  profile: Profile | null
-  loading: boolean
-  authLoaded: boolean
-  profileLoaded: boolean
-  error: string | null
-  refreshProfile: () => Promise<void>
-  signOut: () => Promise<void>
+  user: User | null;
+  session: Session | null;
+  profile: Profile | null;
+  loading: boolean;
+  authLoaded: boolean;
+  profileLoaded: boolean;
+  error: string | null;
+  refreshProfile: () => Promise<void>;
+  signOut: () => Promise<void>;
 }
 
 // Create the context with a default value
@@ -27,7 +35,7 @@ interface AuthProviderProps {
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
-  const supabase = createClientComponentClient<Database>();
+  const supabase = createClientComponentSupabase();
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -46,106 +54,115 @@ export function AuthProvider({ children }: AuthProviderProps) {
         setLoading(false);
         setAuthLoaded(true);
         setProfileLoaded(true);
-        
+
         if (!error) {
           setError('Authentication timed out. Please refresh the page.');
         }
       }
     }, 5000);
-    
+
     return () => clearTimeout(safetyTimeout);
   }, [loading, error]);
 
   // Helper function to fetch profile using RPC first, with fallback to direct query
-  const fetchProfile = useCallback(async (userId: string) => {
-    if (!userId) {
-      console.warn('[fetchProfile] Called with no userId');
-      setProfileLoaded(true); // Mark as loaded even if no user
-      return;
-    }
+  const fetchProfile = useCallback(
+    async (userId: string) => {
+      if (!userId) {
+        console.warn('[fetchProfile] Called with no userId');
+        setProfileLoaded(true); // Mark as loaded even if no user
+        return;
+      }
 
-    console.log(`[fetchProfile] Fetching profile for user: ${userId}`);
-    
-    try {
-      // First try direct fetch from profiles table - simpler approach to make sure it works
-      console.log('[fetchProfile] Attempting direct fetch...');
-      const { data: directData, error: directError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', userId)
-        .single();
-        
-      if (directError) {
-        if (directError.code === 'PGRST116') {
-          // No profile found via direct query
-          console.log('[fetchProfile] No profile found via direct query');
-          
-          // Attempt to create a profile if it doesn't exist
-          console.log('[fetchProfile] Attempting to create a new profile...');
-          try {
-            const { error: insertError } = await supabase
-              .from('profiles')
-              .insert({
+      console.log(`[fetchProfile] Fetching profile for user: ${userId}`);
+
+      try {
+        // First try direct fetch from profiles table - simpler approach to make sure it works
+        console.log('[fetchProfile] Attempting direct fetch...');
+        const { data: directData, error: directError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', userId)
+          .single();
+
+        if (directError) {
+          if (directError.code === 'PGRST116') {
+            // No profile found via direct query
+            console.log('[fetchProfile] No profile found via direct query');
+
+            // Attempt to create a profile if it doesn't exist
+            console.log('[fetchProfile] Attempting to create a new profile...');
+            try {
+              const { error: insertError } = await supabase.from('profiles').insert({
                 id: userId,
                 first_name: '',
                 last_name: '',
                 role: 'unassigned',
-                updated_at: new Date().toISOString()
+                updated_at: new Date().toISOString(),
               });
-              
-            if (insertError) {
-              console.error('[fetchProfile] Error creating profile:', insertError);
-              setError('Failed to create user profile. Please contact support.');
+
+              if (insertError) {
+                console.error('[fetchProfile] Error creating profile:', insertError);
+                setError('Failed to create user profile. Please contact support.');
+                setProfile(null);
+              } else {
+                console.log('[fetchProfile] Profile created successfully, fetching new profile...');
+
+                // Fetch the newly created profile after a short delay to allow for db propagation
+                setTimeout(async () => {
+                  const { data: newProfile, error: fetchError } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', userId)
+                    .single();
+
+                  if (fetchError) {
+                    console.error('[fetchProfile] Error fetching new profile:', fetchError);
+                    setProfile(null);
+                  } else {
+                    console.log('[fetchProfile] New profile fetched:', newProfile);
+                    setProfile(newProfile);
+                  }
+                  setProfileLoaded(true);
+                }, 500);
+                return; // Exit early as we're handling the profile loaded state in the timeout
+              }
+            } catch (createErr) {
+              console.error('[fetchProfile] Exception creating profile:', createErr);
+              setError(
+                `Error creating profile: ${
+                  createErr instanceof Error ? createErr.message : 'Unknown error'
+                }`
+              );
               setProfile(null);
-            } else {
-              console.log('[fetchProfile] Profile created successfully, fetching new profile...');
-              
-              // Fetch the newly created profile after a short delay to allow for db propagation
-              setTimeout(async () => {
-                const { data: newProfile, error: fetchError } = await supabase
-                  .from('profiles')
-                  .select('*')
-                  .eq('id', userId)
-                  .single();
-                  
-                if (fetchError) {
-                  console.error('[fetchProfile] Error fetching new profile:', fetchError);
-                  setProfile(null);
-                } else {
-                  console.log('[fetchProfile] New profile fetched:', newProfile);
-                  setProfile(newProfile);
-                }
-                setProfileLoaded(true);
-              }, 500);
-              return; // Exit early as we're handling the profile loaded state in the timeout
             }
-          } catch (createErr: any) {
-            console.error('[fetchProfile] Exception creating profile:', createErr);
-            setError(`Error creating profile: ${createErr.message}`);
+          } else {
+            console.error('[fetchProfile] Direct fetch error:', directError);
+            setError(`Failed to fetch profile: ${directError.message}`);
             setProfile(null);
           }
+        } else if (directData) {
+          console.log('[fetchProfile] Profile fetched via direct access:', directData);
+          setProfile(directData);
         } else {
-          console.error('[fetchProfile] Direct fetch error:', directError);
-          setError(`Failed to fetch profile: ${directError.message}`);
+          // If we get here, no profile was found via either method
+          console.warn('[fetchProfile] No profile found for user');
           setProfile(null);
         }
-      } else if (directData) {
-        console.log('[fetchProfile] Profile fetched via direct access:', directData);
-        setProfile(directData);
-      } else {
-        // If we get here, no profile was found via either method
-        console.warn('[fetchProfile] No profile found for user');
-        setProfile(null);
+      } catch (err) {
+        console.error('[fetchProfile] Catch block error:', err);
+        setError(
+          `Unexpected error fetching profile: ${
+            err instanceof Error ? err.message : 'Unknown error'
+          }`
+        );
+        setProfile(null); // Reset profile on error
+      } finally {
+        // Always mark profile as loaded unless we exited early
+        setProfileLoaded(true);
       }
-    } catch (err: any) {
-      console.error('[fetchProfile] Catch block error:', err);
-      setError(`Unexpected error fetching profile: ${err.message}`);
-      setProfile(null); // Reset profile on error
-    } finally {
-      // Always mark profile as loaded unless we exited early
-      setProfileLoaded(true);
-    }
-  }, [supabase]);
+    },
+    [supabase]
+  );
 
   // Public method to manually refresh the profile
   const refreshProfile = useCallback(async () => {
@@ -153,21 +170,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
       console.warn('[refreshProfile] Cannot refresh - no user logged in');
       return;
     }
-    
+
     console.log('[refreshProfile] Manually refreshing profile');
     setLoading(true);
     setError(null);
     setProfileLoaded(false);
-    
+
     try {
       await fetchProfile(user.id);
-    } catch (err: any) {
+    } catch (err) {
       console.error('[refreshProfile] Error during refresh:', err);
-      setError(`Refresh error: ${err.message}`);
+      setError(`Refresh error: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setLoading(false);
       // Ensure profileLoaded is set to true no matter what
-      setProfileLoaded(true); 
+      setProfileLoaded(true);
     }
   }, [user, fetchProfile]);
 
@@ -176,53 +193,53 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (initAttempted) {
       return; // Prevent multiple initialization attempts
     }
-    
-    console.log("[AuthContext] Starting initialization...");
+
+    console.log('[AuthContext] Starting initialization...');
     setInitAttempted(true); // Mark that we've tried to initialize
-    
+
     // 1. Get initial session
     const fetchInitialSession = async () => {
       try {
-        console.log("[AuthContext] Fetching initial session...");
+        console.log('[AuthContext] Fetching initial session...');
         const { data, error: sessionError } = await supabase.auth.getSession();
-        
+
         if (sessionError) {
-          console.error("[AuthContext] Error fetching initial session:", sessionError);
+          console.error('[AuthContext] Error fetching initial session:', sessionError);
           setError(`Session error: ${sessionError.message}`);
           setLoading(false);
           setAuthLoaded(true);
           setProfileLoaded(true);
           return;
         }
-        
+
         const currentSession = data.session;
-        console.log("[AuthContext] Initial session:", currentSession);
-        
+        console.log('[AuthContext] Initial session:', currentSession);
+
         // Always set auth as loaded after session check
         setAuthLoaded(true);
-        
+
         // Set session state
         setSession(currentSession);
-        
+
         // Handle user data
         const currentUser = currentSession?.user || null;
-        console.log("[AuthContext] Current user:", currentUser?.id || "none");
+        console.log('[AuthContext] Current user:', currentUser?.id || 'none');
         setUser(currentUser);
 
         // Fetch profile only if user exists
         if (currentUser) {
           await fetchProfile(currentUser.id);
         } else {
-          console.log("[AuthContext] No user, skipping profile fetch");
+          console.log('[AuthContext] No user, skipping profile fetch');
           setProfileLoaded(true); // No user, so profile loading is "complete"
         }
-        
+
         // Finish initialization
         setLoading(false);
-        console.log("[AuthContext] Initialization complete");
-      } catch (err: any) {
-        console.error("[AuthContext] Initialization error:", err);
-        setError(`Authentication error: ${err.message}`);
+        console.log('[AuthContext] Initialization complete');
+      } catch (err) {
+        console.error('[AuthContext] Initialization error:', err);
+        setError(`Authentication error: ${err instanceof Error ? err.message : 'Unknown error'}`);
         setLoading(false);
         setAuthLoaded(true);
         setProfileLoaded(true);
@@ -233,67 +250,73 @@ export function AuthProvider({ children }: AuthProviderProps) {
     fetchInitialSession();
 
     // 2. Subscribe to auth changes
-    const { data: listener } = supabase.auth.onAuthStateChange(
-      async (event, changedSession) => {
-        console.log('[AuthContext] Auth state change event:', event);
-        
-        // Always update session
-        setSession(changedSession);
-        
-        // Get user from session
-        const changedUser = changedSession?.user || null;
-        
-        // If user changed, update user state
-        if (JSON.stringify(changedUser) !== JSON.stringify(user)) {
-          console.log('[AuthContext] User changed:', changedUser?.id || "none");
-          setUser(changedUser);
-        }
+    const { data: listener } = supabase.auth.onAuthStateChange(async (event, changedSession) => {
+      console.log('[AuthContext] Auth state change event:', event);
 
-        if (event === 'SIGNED_IN' && changedUser) {
-          console.log('[AuthContext] Processing sign in event');
-          setLoading(true);
-          setProfileLoaded(false);
-          
-          try {
-            await fetchProfile(changedUser.id);
-          } catch (err) {
-            console.error('[AuthContext] Error fetching profile after sign in:', err);
-          } finally {
-            setLoading(false);
-            setProfileLoaded(true);
-          }
-        }
-        
-        if (event === 'SIGNED_OUT') {
-          console.log('[AuthContext] Processing sign out event');
-          setUser(null);
-          setProfile(null);
-          setProfileLoaded(true);
+      // Always update session
+      setSession(changedSession);
+
+      // Get user from session
+      const changedUser = changedSession?.user || null;
+
+      // If user changed, update user state
+      if (JSON.stringify(changedUser) !== JSON.stringify(user)) {
+        console.log('[AuthContext] User changed:', changedUser?.id || 'none');
+        setUser(changedUser);
+      }
+
+      if (event === 'SIGNED_IN' && changedUser) {
+        console.log('[AuthContext] Processing sign in event');
+        setLoading(true);
+        setProfileLoaded(false);
+
+        try {
+          await fetchProfile(changedUser.id);
+        } catch (err) {
+          console.error('[AuthContext] Error fetching profile after sign in:', err);
+        } finally {
           setLoading(false);
+          setProfileLoaded(true);
         }
       }
-    );
+
+      if (event === 'SIGNED_OUT') {
+        console.log('[AuthContext] Processing sign out event');
+        setUser(null);
+        setProfile(null);
+        setProfileLoaded(true);
+        setLoading(false);
+      }
+    });
 
     // Cleanup listener on unmount
     return () => {
-      console.log("[AuthContext] Cleaning up auth listener");
+      console.log('[AuthContext] Cleaning up auth listener');
       listener?.subscription.unsubscribe();
     };
   }, [initAttempted, user, fetchProfile, supabase.auth]);
 
   // Sign out function
   const signOut = async () => {
-    console.log("[signOut] Initiating sign out...");
+    console.log('[signOut] Initiating sign out...');
     setLoading(true);
     try {
-      await supabase.auth.signOut();
-    } catch (err: any) {
-      console.error("[signOut] Error signing out:", err);
-      setError(`Sign out error: ${err.message}`);
-    } finally {
-      // Manually clear state in case event listener doesn't fire
+      // Use our server action for logout
+      const result = await logoutUser();
+
+      if (!result.success) {
+        throw new Error(result.error);
+      }
+
+      // Clear state immediately after successful logout
       setUser(null);
+      setSession(null);
       setProfile(null);
+    } catch (err) {
+      console.error('[signOut] Error signing out:', err);
+      setError(`Sign out error: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      // Ensure loading state is cleared
       setLoading(false);
       setProfileLoaded(true);
     }
@@ -329,4 +352,4 @@ export function useAuth() {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
-} 
+}
