@@ -11,7 +11,8 @@ RETURNS TABLE (
   chunk_text text,
   similarity float,
   document_title text,
-  document_status text
+  document_status text,
+  metadata jsonb
 )
 LANGUAGE plpgsql
 AS $$
@@ -24,7 +25,8 @@ BEGIN
     pc.chunk_text,
     (1 - (pc.embedding <=> query_embedding)) AS similarity,
     pd.title AS document_title,
-    pd.status AS document_status
+    pd.status AS document_status,
+    pc.metadata
   FROM
     policy_chunks pc
   JOIN

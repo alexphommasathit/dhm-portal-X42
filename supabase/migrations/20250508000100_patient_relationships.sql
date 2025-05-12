@@ -1,0 +1,11 @@
+-- Migration: Create patient_relationships table for tracking family members and caregivers
+-- Timestamp: 20250508000100
+-- CONTENTS INTENTIONALLY REMOVED OR REFACTORED due to redundancy with public.patient_family_links table and its related logic.
+-- The public.patient_family_links table (defined in 20250500000002_create_patient_portal_tables.sql)
+-- and its RLS policies (defined in 20250507000811_rls_patient_family_links_policies.sql)
+-- along with RPC functions in 20250508000000_patient_portal_invitations.sql (which now use patient_family_links)
+-- provide the necessary functionality for linking patients to family contacts.
+
+-- Original CREATE TABLE, CREATE INDEX, RLS policies, and RPC function related to patient_relationships have been removed from this file.
+-- If any specific functionality from the original revoke_patient_relationship function is still needed,
+-- it should be reimplemented as a new migration targeting patient_family_links. 

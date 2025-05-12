@@ -1,0 +1,6 @@
+-- Migration: Add RLS Policies for patient_documents table
+-- Timestamp: 20250506235311
+-- CONTENTS INTENTIONALLY REMOVED.
+-- The definitive schema for public.patient_documents, including its RLS enablement and policies,
+-- is now handled in migration file 20250508000200_patient_documents.sql.
+-- This file is now redundant for patient_documents RLS. 

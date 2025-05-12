@@ -88,6 +88,10 @@ export default function Home() {
 
   // Function to get URL for a resource
   const getResourceUrl = (resource: string): string => {
+    // Special case for scheduling to direct to our new page
+    if (resource === 'schedules') {
+      return '/scheduling';
+    }
     return `/${resource}`;
   };
 

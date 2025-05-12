@@ -13,6 +13,237 @@ const CHUNK_SIZE = 1000;
 const CHUNK_OVERLAP = 100;
 const OPENAI_EMBEDDING_MODEL = 'text-embedding-3-small';
 
+// Interface for chunks with associated section titles
+interface ChunkWithSection {
+  text: string;
+  sectionTitle: string | null;
+}
+
+// Helper function to subdivide a larger text block into smaller chunks
+// Based on the original createChunks logic
+function subDivideText(text: string, chunkSize: number, chunkOverlap: number): string[] {
+  if (!text || text.trim().length === 0) return [];
+  const subChunks: string[] = [];
+  let startIndex = 0;
+  while (startIndex < text.length) {
+    const endIndex = Math.min(startIndex + chunkSize, text.length);
+    const currentSubChunk = text.substring(startIndex, endIndex);
+    if (currentSubChunk.trim().length > 0) {
+      // Only add non-empty chunks
+      subChunks.push(currentSubChunk);
+    }
+
+    if (endIndex === text.length) break;
+
+    startIndex = endIndex - chunkOverlap;
+
+    if (startIndex >= text.length) break; // Avoids issues if overlap pushes past end
+
+    if (text.length - startIndex < chunkSize / 4) {
+      const remainingText = text.substring(startIndex);
+      if (remainingText.trim().length > 0) {
+        // Only add non-empty remaining part
+        subChunks.push(remainingText);
+      }
+      break;
+    }
+    // Safety break if startIndex doesn't advance sufficiently (e.g. overlap >= size)
+    if (startIndex <= endIndex - chunkSize) {
+      // If it didn't move forward from last chunk start
+      if (chunkSize > chunkOverlap) {
+        // Ensure it can advance
+        startIndex = endIndex - chunkOverlap + 1; // Force minimal advancement
+        if (startIndex >= text.length) break;
+      } else {
+        // Cannot advance if overlap is too large, break to prevent infinite loop
+        console.warn(
+          '[policy-parser] subDivideText: CHUNK_OVERLAP >= CHUNK_SIZE, breaking to prevent loop with text:',
+          text.substring(0, 50)
+        );
+        break;
+      }
+    }
+  }
+  return subChunks;
+}
+
+// New function to create chunks and attempt to associate them with section titles
+function createChunksWithSections(
+  fullText: string,
+  documentTitle: string, // Used as default/initial section title
+  chunkSize: number,
+  chunkOverlap: number
+): ChunkWithSection[] {
+  const finalChunkObjects: ChunkWithSection[] = [];
+  if (!fullText || fullText.trim().length === 0) return finalChunkObjects;
+
+  // ---- START: Two-stage pre-processing of fullText ----
+  const normalizedText = fullText.replace(/\r\n/g, '\n').replace(/\r/g, '\n'); // Normalize newlines
+
+  // Stage 1: Split into major blocks based on two or more newlines (and potential whitespace between them)
+  const majorBlocks = normalizedText.split(/\n\s*\n+/);
+
+  const trulyGranularLines: string[] = [];
+
+  for (const block of majorBlocks) {
+    if (block.trim().length === 0) continue; // Skip empty blocks
+
+    // Stage 2: Apply finer-grained regex splitting to each major block
+    let processedBlock = block;
+    // Heuristic: Break before potential page numbers in TOC-like lines
+    processedBlock = processedBlock.replace(
+      /([a-zA-Z0-9.)])(\s{2,}|\t)(\d+(\.\d+)*[A-Z]?)/g,
+      '$1\n$3'
+    );
+    // Heuristic: Break if multiple spaces are followed by a capital letter
+    processedBlock = processedBlock.replace(/([a-z0-9.,:;)])(\s{2,})([A-Z])/g, '$1\n$3');
+
+    trulyGranularLines.push(...processedBlock.split('\n'));
+  }
+
+  // Filter out any empty strings that might result from multiple splits and trim lines
+  const lines = trulyGranularLines.map(line => line.trim()).filter(line => line.length > 0);
+  // ---- END: Two-stage pre-processing ----
+
+  let currentSectionTextBuffer: string[] = [];
+  // Initialize with document title, but prefer first actual heuristic match if found early
+  let activeSectionTitle: string | null = documentTitle;
+  let firstHeuristicTitleFound = false;
+
+  // ---- START DIAGNOSTIC LOGGING FOR HEURISTICS ----
+  const enableHeuristicLogging = false; // Set to false to disable verbose logs
+  // ---- END DIAGNOSTIC LOGGING FOR HEURISTICS ----
+
+  const processSectionBuffer = () => {
+    if (currentSectionTextBuffer.length > 0) {
+      const sectionText = currentSectionTextBuffer.join('\\n');
+      if (sectionText.trim().length > 0) {
+        // Ensure section text is not just whitespace
+        const textSubChunks = subDivideText(sectionText, chunkSize, chunkOverlap);
+        textSubChunks.forEach(subChunkText => {
+          finalChunkObjects.push({
+            text: subChunkText,
+            sectionTitle: activeSectionTitle,
+          });
+        });
+      }
+      currentSectionTextBuffer = []; // Reset buffer
+    }
+  };
+
+  for (const line of lines) {
+    const trimmedLine = line.trim();
+    let isSectionTitleLine = false;
+
+    if (enableHeuristicLogging) {
+      console.log(
+        `[ParserHeuristic] Checking line: "${trimmedLine}" (Length: ${trimmedLine.length})`
+      );
+    }
+
+    if (trimmedLine.length > 0 && trimmedLine.length < 120) {
+      if (/^TABLE OF CONTENTS/i.test(trimmedLine)) {
+        if (enableHeuristicLogging)
+          console.log('[ParserHeuristic] Line is Table of Contents, skipping.');
+      } else {
+        const letterChars = (trimmedLine.match(/[a-zA-Z]/g) || []).length;
+        const upperCaseChars = (trimmedLine.match(/[A-Z]/g) || []).length;
+        const isMostlyAllCaps =
+          letterChars > 0 && upperCaseChars / letterChars > 0.5 && letterChars >= 3;
+        if (enableHeuristicLogging)
+          console.log(`[ParserHeuristic]   isMostlyAllCaps: ${isMostlyAllCaps}`);
+
+        const startsWithNumberingOrKeyword =
+          /^((\d+(\.\d+)*\s*)|([A-Z]\.)|([A-Z]\))|(PART|CHAPTER|SECTION|APPENDIX)\s+[A-Z0-9IVXLCDM]+([\.\s:]|$))/i.test(
+            trimmedLine.substring(0, 30)
+          );
+        if (enableHeuristicLogging)
+          console.log(
+            `[ParserHeuristic]   startsWithNumberingOrKeyword: ${startsWithNumberingOrKeyword}`
+          );
+
+        let isProbableTitleCase = false;
+        if (!isMostlyAllCaps && !startsWithNumberingOrKeyword && letterChars > 0) {
+          const words = trimmedLine.split(' ');
+          if (words.length > 1 && words.length < 10) {
+            let capitalizedWords = 0;
+            for (const word of words) {
+              if (word.length > 0 && /^[A-Z]/.test(word)) {
+                capitalizedWords++;
+              }
+            }
+            if (capitalizedWords / words.length >= 0.5) {
+              if (!/[.!?,;:]$/.test(trimmedLine)) {
+                isProbableTitleCase = true;
+              }
+            }
+            if (enableHeuristicLogging) {
+              console.log(
+                `[ParserHeuristic]   ProbableTitleCase Check: words: [${words.join(',')}] (count: ${
+                  words.length
+                }), capitalizedWords: ${capitalizedWords}, endsWithPunct: ${/[.!?,;:]$/.test(
+                  trimmedLine
+                )}, result: ${isProbableTitleCase}`
+              );
+            }
+          }
+        }
+        if (enableHeuristicLogging && (isMostlyAllCaps || startsWithNumberingOrKeyword)) {
+          // Log only if title case check wasn't the primary trigger for logging its details
+          if (!isProbableTitleCase)
+            console.log(
+              `[ParserHeuristic]   isProbableTitleCase (not primary eval): ${isProbableTitleCase}`
+            );
+        }
+
+        if (isMostlyAllCaps || startsWithNumberingOrKeyword || isProbableTitleCase) {
+          if (trimmedLine.split(' ').length < 15) {
+            isSectionTitleLine = true;
+          }
+        }
+      }
+    }
+    if (enableHeuristicLogging)
+      console.log(
+        `[ParserHeuristic] Final isSectionTitleLine: ${isSectionTitleLine} for "${trimmedLine}"`
+      );
+
+    if (isSectionTitleLine) {
+      processSectionBuffer();
+      activeSectionTitle = trimmedLine;
+      if (enableHeuristicLogging)
+        console.log(
+          `[ParserHeuristic] ***** NEW ActiveSectionTitle: "${activeSectionTitle}" *****`
+        );
+      if (!firstHeuristicTitleFound) firstHeuristicTitleFound = true;
+      currentSectionTextBuffer.push(line);
+    } else {
+      // If no heuristic title has been found yet, and buffer is empty,
+      // the initial activeSectionTitle (documentTitle) applies until first real title.
+      currentSectionTextBuffer.push(line);
+    }
+  }
+
+  processSectionBuffer(); // Process any remaining text
+
+  // If no heuristic titles were found at all, all chunks will have the documentTitle.
+  // If some were found, ensure all chunks have a non-null sectionTitle if possible
+  if (finalChunkObjects.length > 0 && !firstHeuristicTitleFound) {
+    // This case means all chunks got documentTitle, which is fine.
+  } else if (
+    finalChunkObjects.length > 0 &&
+    finalChunkObjects[0].sectionTitle === null &&
+    documentTitle
+  ) {
+    // Fallback if somehow the very first section title was null but documentTitle exists
+    finalChunkObjects.forEach(c => {
+      if (c.sectionTitle === null) c.sectionTitle = documentTitle;
+    });
+  }
+
+  return finalChunkObjects;
+}
+
 // --- Implement Real Extraction ---
 
 async function extractTextFromPdf(fileBuffer: ArrayBuffer): Promise<string> {
@@ -59,23 +290,23 @@ async function extractTextFromPdf(fileBuffer: ArrayBuffer): Promise<string> {
 // }
 
 // Reusable chunking function
-function createChunks(text: string): string[] {
-  if (!text) return [];
-  const chunks: string[] = [];
-  let startIndex = 0;
-  while (startIndex < text.length) {
-    const endIndex = Math.min(startIndex + CHUNK_SIZE, text.length);
-    const chunk = text.substring(startIndex, endIndex);
-    chunks.push(chunk);
-    startIndex = endIndex - CHUNK_OVERLAP;
-    if (startIndex >= text.length) break;
-    if (text.length - startIndex < CHUNK_SIZE / 4) {
-      chunks.push(text.substring(startIndex));
-      break;
-    }
-  }
-  return chunks;
-}
+// function createChunks(text: string): string[] { // OLD FUNCTION - REMOVED
+//   if (!text) return [];
+//   const chunks: string[] = [];
+//   let startIndex = 0;
+//   while (startIndex < text.length) {
+//     const endIndex = Math.min(startIndex + CHUNK_SIZE, text.length);
+//     const chunk = text.substring(startIndex, endIndex);
+//     chunks.push(chunk);
+//     startIndex = endIndex - CHUNK_OVERLAP;
+//     if (startIndex >= text.length) break;
+//     if (text.length - startIndex < CHUNK_SIZE / 4) {
+//       chunks.push(text.substring(startIndex));
+//       break;
+//     }
+//   }
+//   return chunks;
+// }
 
 // Function to generate embeddings using OpenAI API
 async function generateEmbeddings(chunks: string[], apiKey: string): Promise<(number[] | null)[]> {
@@ -379,23 +610,26 @@ serve(async (req: Request) => {
     }
 
     // 4. Create chunks
-    const chunks = createChunks(text);
-    console.log(`[policy-parser] Created ${chunks.length} chunks.`);
+    // const chunks = createChunks(text); // OLD CALL - REMOVED
+    const chunkObjects = createChunksWithSections(text, document.title, CHUNK_SIZE, CHUNK_OVERLAP);
+    console.log(
+      `[policy-parser] Created ${chunkObjects.length} chunk objects (with section titles).`
+    );
 
     // 5. Generate Embeddings (only if chunks exist)
     let embeddings: (number[] | null)[] = [];
-    if (chunks.length > 0 && openAIKey) {
-      // Check if key exists
-      embeddings = await generateEmbeddings(chunks, openAIKey);
-      if (embeddings.length !== chunks.length || embeddings.some(e => e === null)) {
-        // Handle cases where embedding failed for some/all chunks
+    const textsToEmbed = chunkObjects.map(co => co.text);
+
+    if (textsToEmbed.length > 0 && openAIKey) {
+      embeddings = await generateEmbeddings(textsToEmbed, openAIKey);
+      if (embeddings.length !== textsToEmbed.length || embeddings.some(e => e === null)) {
         console.warn(
           '[policy-parser] Embedding generation failed or incomplete. Some chunks might lack embeddings.'
         );
       }
-    } else if (chunks.length > 0) {
+    } else if (textsToEmbed.length > 0) {
       console.warn('[policy-parser] OpenAI API Key not found. Skipping embedding generation.');
-      embeddings = chunks.map(() => null); // Ensure embeddings array matches chunk length
+      embeddings = textsToEmbed.map(() => null);
     }
 
     // 6. Delete existing chunks
@@ -410,16 +644,17 @@ serve(async (req: Request) => {
     }
 
     // 7. Prepare new chunk data (including embeddings)
-    const chunkData = chunks.map((chunkText, i) => ({
+    const chunkData = chunkObjects.map((chunkObj, i) => ({
       document_id: documentId,
       chunk_index: i,
-      chunk_text: chunkText,
+      chunk_text: chunkObj.text,
       embedding: embeddings[i] ?? null, // Assign generated embedding or null
       metadata: {
-        title: document.title,
+        title: document.title, // Document's main title
         document_status: document.status,
         chunk_number: i + 1,
-        total_chunks: chunks.length,
+        total_chunks: chunkObjects.length,
+        section_title: chunkObj.sectionTitle, // Store the heuristically extracted section title
       },
     }));
 
@@ -445,12 +680,12 @@ serve(async (req: Request) => {
     // --- End Main Logic ---
 
     console.log(
-      `[policy-parser] Successfully processed document ${documentId} into ${chunks.length} chunks.`
+      `[policy-parser] Successfully processed document ${documentId} into ${chunkObjects.length} chunks.`
     );
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Document processed into ${chunks.length} chunks. Embedding generation ${
+        message: `Document processed into ${chunkObjects.length} chunks. Embedding generation ${
           openAIKey
             ? embeddings.some(e => e === null)
               ? 'partially failed'

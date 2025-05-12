@@ -184,3 +184,60 @@ SUPABASE_URL=your-supabase-url
   - `react-hot-toast` (Notifications)
 
 ## Development Notes
+
+## Scripting Recommendations
+
+For consistency in executing arbitrary SQL from Node.js scripts within this project, consider the following:
+
+### Refactor Scripts to Use `pg_query` RPC Function
+
+Scripts such as `fix-cloud.js`, `apply-dev-setup.js`, and `simple-fix.js` currently use direct `fetch` calls to the `/rest/v1/sql` Supabase endpoint.
+
+It is recommended to refactor these scripts to utilize the `public.pg_query` PostgreSQL function via the Supabase client's RPC method: `supabase.rpc('pg_query', { sql_query: yourSqlStatement })`.
+
+This approach aligns with the method used in `direct-sql.js` and provides a single, robust, and debugged pathway for SQL execution from Node.js scripts.
+
+**Prerequisites for this refactoring:**
+
+1.  Ensure the `public.pg_query` function (as defined and corrected during recent debugging) is present in the target Supabase database.
+2.  The Node.js script must initialize a Supabase client instance (typically using the service role key for admin-level tasks).
+
+This will simplify maintenance and ensure a consistent interface for database script operations.
+
+## ⚠️ Supabase Local Development Caveats
+
+- The Supabase CLI/Docker local environment may not enforce all Postgres constraints as defined in migrations.
+- Known issues:
+  - `NOT NULL` constraints on `public.profiles` columns may not be enforced locally.
+  - A rogue foreign key (`profiles_id_fkey` on `id`) may appear locally, causing insert errors, but does not exist in the cloud.
+- **Workaround:** Always validate your migrations by pushing to a Supabase cloud project (`supabase db push`). The cloud environment will enforce constraints as expected.
+- For production and staging, rely on the cloud project as the source of truth for schema and data integrity.
+
+---
+
+## Supabase Local Development: Troubleshooting & Best Practices
+
+### Problem
+
+When using Supabase locally (via CLI/Docker), you may encounter issues where:
+- `NOT NULL` constraints and some foreign keys are not enforced as defined in your migrations.
+- A foreign key constraint (`profiles_id_fkey` on `public.profiles.id`) is created locally, but not in the cloud, causing insert errors for rows not linked to `auth.users`.
+
+### Symptoms
+- Inserts into `public.profiles` fail locally with `violates foreign key constraint "profiles_id_fkey"`.
+- `information_schema.columns` shows columns as nullable locally, even if defined as `NOT NULL` in migrations.
+- The cloud project (Supabase Dashboard) shows the correct schema and constraints.
+
+### Workaround
+- **Always push and validate migrations in a Supabase cloud project:**
+  - Link your local CLI to the cloud project: `supabase link --project-ref <project_id>`
+  - Push migrations: `supabase db push`
+  - Use the cloud dashboard's SQL editor to verify schema and constraints.
+- Use the cloud project as the source of truth for schema and production-like testing.
+- For local development, be aware that some constraints may not be enforced. Validate critical changes in the cloud.
+
+### Reporting
+- If you encounter these issues, consider reporting them to Supabase support or GitHub, referencing your experience and this documentation.
+
+### Goal
+- **Ultimate goal:** Achieve local development that mirrors the cloud. Track Supabase CLI updates and revisit local behavior as the tooling improves.
