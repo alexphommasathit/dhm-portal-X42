@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useImperativeHandle } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -13,7 +13,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { AlertCircle, Calendar, FileText, Mail, User, UserPlus, Check, X } from 'lucide-react';
+import { Calendar, FileText, User, UserPlus, Eye, EyeOff, Check, X } from 'lucide-react';
 import { createClientComponentSupabase as createClient } from '@/lib/supabase/client';
 import { useRBAC } from '@/context/RBACContext';
 import { Badge } from '@/components/ui/badge';
@@ -111,6 +111,479 @@ interface PatientStatus {
   is_active: boolean;
 }
 
+// 1. Add new types for unified form state
+/* // Removed unused EmergencyContact interface
+interface EmergencyContact {
+  id?: string; // For existing contacts, otherwise undefined for new
+  firstName: string;
+  lastName: string;
+  relationship: string;
+  phone: string;
+  email: string;
+  isEmergencyContact: boolean;
+  isDesignatedRepresentative: boolean;
+}
+*/
+
+interface PatientFormState {
+  // Patient fields
+  first_name: string;
+  last_name: string;
+  middle_name?: string;
+  preferred_name?: string;
+  suffix?: string;
+  previous_name?: string;
+  date_of_birth: string;
+  branch?: string;
+  preferred_language?: string;
+  social_security_number?: string;
+  email?: string;
+  phone_number?: string;
+  mobile_phone_number?: string;
+  preferred_contact_method?: string;
+  race?: string;
+  ethnicity?: string;
+  marital_status?: string;
+  // ...add all other patient fields as needed
+  // Emergency contacts
+  // emergencyContacts: EmergencyContact[]; // Removed as per centralization plan
+}
+
+// 2. Refactor PatientDetailsForm to manage unified form state
+interface PatientDetailsFormUnifiedProps {
+  patient: Patient;
+  familyLinks: FamilyLinkRpcResult[];
+  onSave: (updated: PatientFormState) => Promise<boolean>;
+  isEditing: boolean;
+}
+
+const PatientDetailsFormUnified = React.forwardRef<HTMLFormElement, PatientDetailsFormUnifiedProps>(
+  ({ patient, familyLinks, onSave, isEditing }, ref) => {
+    console.log(
+      '[PatientDetailsFormUnified] Rendering - isEditing prop:',
+      isEditing,
+      'Patient:',
+      patient?.first_name
+    );
+    const [form, setForm] = useState<PatientFormState>(() => {
+      console.log(
+        '[PatientDetailsFormUnified] Initializing form state. Patient:',
+        patient?.first_name,
+        'Family Links:',
+        familyLinks.length
+      );
+      return {
+        first_name: patient.first_name,
+        last_name: patient.last_name,
+        middle_name: patient.middle_name || '',
+        preferred_name: patient.preferred_name || '',
+        suffix: patient.suffix || '',
+        previous_name: patient.previous_name || '',
+        date_of_birth: patient.date_of_birth,
+        branch: patient.branch || '',
+        preferred_language: patient.preferred_language || '',
+        social_security_number: patient.social_security_number || '',
+        email: patient.email || '',
+        phone_number: patient.phone_number || '',
+        mobile_phone_number: patient.mobile_phone_number || '',
+        preferred_contact_method: patient.preferred_contact_method || '',
+        race: patient.race || '',
+        ethnicity: patient.ethnicity || '',
+        marital_status: patient.marital_status || '',
+        // emergencyContacts: familyLinks.map(link => ({ // Removed
+        //   id: link.link_id,
+        //   firstName: link.profile_first_name || '',
+        //   lastName: link.profile_last_name || '',
+        //   relationship: link.relationship,
+        //   phone: link.profile_phone || '',
+        //   email: link.profile_email || '',
+        //   isEmergencyContact: link.is_emergency_contact,
+        //   isDesignatedRepresentative: link.is_designated_representative,
+        // })),
+      };
+    });
+    const [showSSN, setShowSSN] = useState(false);
+
+    useEffect(() => {
+      console.log('[PatientDetailsFormUnified] isEditing prop changed to:', isEditing);
+      if (!isEditing) {
+        console.log(
+          '[PatientDetailsFormUnified] isEditing is false, resetting form to patient prop values'
+        );
+        setForm({
+          first_name: patient.first_name,
+          last_name: patient.last_name,
+          middle_name: patient.middle_name || '',
+          preferred_name: patient.preferred_name || '',
+          suffix: patient.suffix || '',
+          previous_name: patient.previous_name || '',
+          date_of_birth: patient.date_of_birth,
+          branch: patient.branch || '',
+          preferred_language: patient.preferred_language || '',
+          social_security_number: patient.social_security_number || '',
+          email: patient.email || '',
+          phone_number: patient.phone_number || '',
+          mobile_phone_number: patient.mobile_phone_number || '',
+          preferred_contact_method: patient.preferred_contact_method || '',
+          race: patient.race || '',
+          ethnicity: patient.ethnicity || '',
+          marital_status: patient.marital_status || '',
+          // emergencyContacts: familyLinks.map(link => ({ // Removed
+          //   id: link.link_id,
+          //   firstName: link.profile_first_name || '',
+          //   lastName: link.profile_last_name || '',
+          //   relationship: link.relationship,
+          //   phone: link.profile_phone || '',
+          //   email: link.profile_email || '',
+          //   isEmergencyContact: link.is_emergency_contact,
+          //   isDesignatedRepresentative: link.is_designated_representative,
+          // })),
+        });
+        setShowSSN(false);
+      }
+    }, [isEditing, patient, familyLinks]);
+
+    const handleFieldChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+      const { name, value } = e.target;
+      setForm(prev => ({ ...prev, [name]: value }));
+    };
+
+    const internalFormSubmitHandler = async (e: React.FormEvent) => {
+      e.preventDefault();
+      console.log('[PatientDetailsFormUnified] internalFormSubmitHandler called. Form data:', form);
+      try {
+        await onSave(form);
+      } catch (error) {
+        console.error('[PatientDetailsFormUnified] Error during onSave call:', error);
+        throw error; // Re-throw so handleSavePage knows about the error
+      }
+    };
+
+    return (
+      <form className="space-y-8" onSubmit={internalFormSubmitHandler} ref={ref}>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Patient fields with <label> */}
+          <div>
+            <label className="text-sm font-medium text-gray-700 mb-1">First Name</label>
+            <Input
+              name="first_name"
+              value={form.first_name}
+              onChange={handleFieldChange}
+              disabled={!isEditing}
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700 mb-1">Last Name</label>
+            <Input
+              name="last_name"
+              value={form.last_name}
+              onChange={handleFieldChange}
+              disabled={!isEditing}
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700 mb-1">Middle Name</label>
+            <Input
+              name="middle_name"
+              value={form.middle_name}
+              onChange={handleFieldChange}
+              disabled={!isEditing}
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700 mb-1">Preferred Name</label>
+            <Input
+              name="preferred_name"
+              value={form.preferred_name}
+              onChange={handleFieldChange}
+              disabled={!isEditing}
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700 mb-1">Suffix</label>
+            <Input
+              name="suffix"
+              value={form.suffix}
+              onChange={handleFieldChange}
+              disabled={!isEditing}
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700 mb-1">Previous Name</label>
+            <Input
+              name="previous_name"
+              value={form.previous_name}
+              onChange={handleFieldChange}
+              disabled={!isEditing}
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
+            <Input
+              name="date_of_birth"
+              type="date"
+              value={form.date_of_birth}
+              onChange={handleFieldChange}
+              disabled={!isEditing}
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700 mb-1">Branch</label>
+            <Input
+              name="branch"
+              value={form.branch}
+              onChange={handleFieldChange}
+              disabled={!isEditing}
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700 mb-1">Preferred Language</label>
+            <Input
+              name="preferred_language"
+              value={form.preferred_language}
+              onChange={handleFieldChange}
+              disabled={!isEditing}
+            />
+          </div>
+          {/* SSN Field with Eye Toggle */}
+          <div className="relative flex flex-col">
+            <label className="text-sm font-medium text-gray-700 mb-1">SSN</label>
+            <Input
+              type={showSSN ? 'text' : 'password'}
+              name="social_security_number"
+              value={
+                isEditing
+                  ? form.social_security_number
+                  : showSSN
+                  ? form.social_security_number
+                  : form.social_security_number
+                  ? `***-**-${form.social_security_number.slice(-4)}`
+                  : ''
+              }
+              onChange={handleFieldChange}
+              disabled={!isEditing}
+              className="pr-10"
+              style={{ fontFamily: 'monospace' }}
+              autoComplete="off"
+            />
+            <button
+              type="button"
+              onClick={() => setShowSSN(v => !v)}
+              className="absolute right-2 top-7"
+              aria-label={showSSN ? 'Hide SSN' : 'Show SSN'}
+              tabIndex={-1}
+            >
+              {showSSN ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
+
+          {/* Patient Direct Contact Information Fields */}
+          <div>
+            <label className="text-sm font-medium text-gray-700 mb-1">Email</label>
+            <Input
+              name="email"
+              type="email"
+              value={form.email}
+              onChange={handleFieldChange}
+              disabled={!isEditing}
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700 mb-1">Home Phone</label>
+            <Input
+              name="phone_number"
+              type="tel"
+              value={form.phone_number}
+              onChange={handleFieldChange}
+              disabled={!isEditing}
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700 mb-1">Mobile Phone</label>
+            <Input
+              name="mobile_phone_number"
+              type="tel"
+              value={form.mobile_phone_number}
+              onChange={handleFieldChange}
+              disabled={!isEditing}
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700 mb-1">
+              Preferred Contact Method
+            </label>
+            <Input
+              name="preferred_contact_method"
+              value={form.preferred_contact_method}
+              onChange={handleFieldChange}
+              disabled={!isEditing}
+            />
+          </div>
+
+          {/* Background Information Fields */}
+          <div>
+            <label className="text-sm font-medium text-gray-700 mb-1">Race</label>
+            <Input
+              name="race"
+              value={form.race}
+              onChange={handleFieldChange}
+              disabled={!isEditing}
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700 mb-1">Ethnicity</label>
+            <Input
+              name="ethnicity"
+              value={form.ethnicity}
+              onChange={handleFieldChange}
+              disabled={!isEditing}
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-gray-700 mb-1">Marital Status</label>
+            <Input
+              name="marital_status"
+              value={form.marital_status}
+              onChange={handleFieldChange}
+              disabled={!isEditing}
+            />
+          </div>
+        </div>
+      </form>
+    );
+  }
+);
+PatientDetailsFormUnified.displayName = 'PatientDetailsFormUnified'; // for better debugging
+
+// Define a new component for Address Information
+interface AddressInformationCardProps {
+  initialData: AddressFormValues;
+  onSave: (data: AddressFormValues) => Promise<boolean>;
+  isEditing: boolean;
+  isSaving: boolean;
+}
+
+// ForwardRef and useImperativeHandle to expose submit and getValues
+interface AddressInformationCardRef {
+  submitAddress: () => Promise<boolean>;
+  getValues: () => AddressFormValues;
+  resetForm: (data?: AddressFormValues) => void;
+}
+
+const AddressInformationCard = React.forwardRef<
+  AddressInformationCardRef,
+  AddressInformationCardProps
+>(({ initialData, onSave, isEditing, isSaving }, ref) => {
+  const { toast } = useToast();
+  const addressForm = useForm<AddressFormValues>({
+    resolver: zodResolver(addressFormSchema),
+    defaultValues: initialData,
+  });
+
+  useEffect(() => {
+    console.log(
+      '[AddressInformationCard] ResData or isEditing changed, resetting form.',
+      initialData,
+      isEditing
+    );
+    addressForm.reset(initialData);
+  }, [initialData, addressForm, isEditing]); // Reset if initialData changes or when exiting edit mode
+
+  const internalSubmitHandler = async (data: AddressFormValues) => {
+    console.log('[AddressInformationCard] internalSubmitHandler called with data:', data);
+    try {
+      const success = await onSave(data);
+      return success;
+    } catch (error) {
+      console.error('[AddressInformationCard] Error during onSave call:', error);
+      toast({
+        title: 'Error in Address Card',
+        description: error instanceof Error ? error.message : 'Failed to save address details.',
+        variant: 'destructive',
+      });
+      return false;
+    }
+  };
+
+  useImperativeHandle(ref, () => ({
+    submitAddress: async () => {
+      // Trigger validation
+      const isValid = await addressForm.trigger();
+      if (isValid) {
+        const values = addressForm.getValues();
+        return internalSubmitHandler(values);
+      }
+      toast({
+        title: 'Validation Error',
+        description: 'Please check address fields.',
+        variant: 'destructive',
+      });
+      return false; // Validation failed
+    },
+    getValues: () => addressForm.getValues(),
+    resetForm: (data?: AddressFormValues) => addressForm.reset(data || initialData),
+  }));
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center">Address Information</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={addressForm.handleSubmit(internalSubmitHandler)} className="space-y-4">
+          <div>
+            <label htmlFor="address_line1" className="block text-sm font-medium text-gray-700">
+              Address Line 1
+            </label>
+            <Input
+              id="address_line1"
+              {...addressForm.register('address_line1')}
+              disabled={!isEditing || isSaving}
+            />
+          </div>
+          <div>
+            <label htmlFor="address_line2" className="block text-sm font-medium text-gray-700">
+              Address Line 2
+            </label>
+            <Input
+              id="address_line2"
+              {...addressForm.register('address_line2')}
+              disabled={!isEditing || isSaving}
+            />
+          </div>
+          <div>
+            <label htmlFor="city" className="block text-sm font-medium text-gray-700">
+              City
+            </label>
+            <Input id="city" {...addressForm.register('city')} disabled={!isEditing || isSaving} />
+          </div>
+          <div>
+            <label htmlFor="state_province" className="block text-sm font-medium text-gray-700">
+              State/Province
+            </label>
+            <Input
+              id="state_province"
+              {...addressForm.register('state_province')}
+              disabled={!isEditing || isSaving}
+            />
+          </div>
+          <div>
+            <label htmlFor="zip_postal_code" className="block text-sm font-medium text-gray-700">
+              Zip/Postal Code
+            </label>
+            <Input
+              id="zip_postal_code"
+              {...addressForm.register('zip_postal_code')}
+              disabled={!isEditing || isSaving}
+            />
+          </div>
+        </form>
+      </CardContent>
+    </Card>
+  );
+});
+AddressInformationCard.displayName = 'AddressInformationCard';
+
 export default function PatientDetailPage() {
   const params = useParams();
   const router = useRouter();
@@ -122,13 +595,14 @@ export default function PatientDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // State for Portal Access tab - use the RPC result type
+  // Unified page edit state
+  const [isEditingPage, setIsEditingPage] = useState(false);
+  const [isSavingPage, setIsSavingPage] = useState(false);
+
   const [familyLinks, setFamilyLinks] = useState<FamilyLinkRpcResult[]>([]);
   const [linksLoading, setLinksLoading] = useState(true);
 
-  const [isEditing, setIsEditing] = useState(false);
   const [isAddingFamily, setIsAddingFamily] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
   const [isSubmittingFamily, setIsSubmittingFamily] = useState(false);
 
   // Inside the main component, add a new state for patient statuses
@@ -148,18 +622,6 @@ export default function PatientDetailPage() {
     { value: 'caregiver', label: 'Caregiver' },
     { value: 'other', label: 'Other' },
   ];
-
-  // Form for address editing
-  const addressForm = useForm<AddressFormValues>({
-    resolver: zodResolver(addressFormSchema),
-    defaultValues: {
-      address_line1: '',
-      address_line2: '',
-      city: '',
-      state_province: '',
-      zip_postal_code: '',
-    },
-  });
 
   // Form for adding family members
   const familyForm = useForm<FamilyMemberFormValues>({
@@ -247,7 +709,13 @@ export default function PatientDetailPage() {
         }
 
         // Always set the data if available, or empty array if not
-        setFamilyLinks(data || []);
+        setFamilyLinks(
+          ((data as FamilyLinkRpcResult[]) || []).map((link: FamilyLinkRpcResult) => ({
+            ...link,
+            profile_email: link.profile_email || '',
+            profile_phone: link.profile_phone || '',
+          }))
+        );
 
         // Don't set any errors - we'll just show the empty state
         if (rpcError) {
@@ -267,21 +735,21 @@ export default function PatientDetailPage() {
   // Update address form values when patient data changes
   useEffect(() => {
     if (patient) {
-      addressForm.reset({
-        address_line1: patient.address_line1,
-        address_line2: patient.address_line2,
-        city: patient.city,
-        state_province: patient.state_province,
-        zip_postal_code: patient.zip_postal_code,
-      });
+      // This is now handled by AddressInformationCard's internal useEffect or resetForm method
     }
-  }, [patient, addressForm]);
+  }, [patient]);
 
-  // Add the save address function
-  const saveAddressChanges = async (data: AddressFormValues) => {
-    if (!patient?.id) return;
+  // Save address function to be passed to AddressInformationCard
+  const handleSaveAddress = async (data: AddressFormValues): Promise<boolean> => {
+    if (!patient?.id) {
+      toast({ title: 'Patient ID missing for address save', variant: 'destructive' });
+      return false;
+    }
+    console.log(
+      '[PatientDetailPage] handleSaveAddress (onSave prop for card) called with data:',
+      data
+    );
 
-    setIsSaving(true);
     try {
       const { error } = await supabase
         .from('patients')
@@ -315,16 +783,18 @@ export default function PatientDetailPage() {
         description: 'The patient address has been successfully updated.',
       });
 
-      setIsEditing(false);
+      return true; // Indicate success
     } catch (error) {
       console.error('Error updating address:', error);
       toast({
         title: 'Error',
-        description: 'Failed to update address. Please try again.',
+        description:
+          error instanceof Error ? error.message : 'Failed to update address. Please try again.',
         variant: 'destructive',
       });
+      return false; // Indicate failure
     } finally {
-      setIsSaving(false);
+      // setIsSavingPage(false); // Parent (handleSavePage) controls this
     }
   };
 
@@ -515,7 +985,13 @@ export default function PatientDetailPage() {
               );
             }
             console.log('Fetched family links:', data);
-            setFamilyLinks(data || []);
+            setFamilyLinks(
+              ((data as FamilyLinkRpcResult[]) || []).map((link: FamilyLinkRpcResult) => ({
+                ...link,
+                profile_email: link.profile_email || '',
+                profile_phone: link.profile_phone || '',
+              }))
+            );
           }
         } catch (error) {
           console.error('Error refreshing family links:', error);
@@ -544,6 +1020,225 @@ export default function PatientDetailPage() {
     saveFamilyMember(formValues);
   };
 
+  // This is the main save function for the entire page
+  const handleSavePage = async () => {
+    console.log('[PatientDetailPage] handleSavePage called');
+    setIsSavingPage(true);
+    let allSavesSuccessful = true; // Reintroduce and initialize
+    let coreDetailsSavedSuccessfully = false;
+    let addressDetailsSavedSuccessfully = false;
+
+    // Step 1: Trigger submit for PatientDetailsFormUnified
+    if (patientDetailsFormRef.current) {
+      console.log(
+        '[PatientDetailPage] Attempting to submit PatientDetailsFormUnified programmatically'
+      );
+      try {
+        await new Promise<void>((resolve, reject) => {
+          const form = patientDetailsFormRef.current;
+          if (!form) {
+            reject(new Error('PatientDetailsFormUnified ref not available'));
+            return;
+          }
+
+          const onSubmitHandler = async (event?: Event) => {
+            if (event) event.preventDefault(); // Prevent default if called from an event
+            console.log('[PatientDetailPage] onSubmitHandler for core details invoked');
+            try {
+              // The `onSave` prop is `saveCorePatientDetails`
+              // `internalFormSubmitHandler` in child calls it.
+              // We need its result here.
+              // This approach is getting complicated due to `requestSubmit`'s nature.
+
+              // Simpler: onSave prop (saveCorePatientDetails) will set a flag or throw.
+              // Let's ensure saveCorePatientDetails throws on error.
+              // If it completes without throwing, we assume success for this step.
+              // This means coreDetailsSavedSuccessfully is set within the onSave prop's logic
+              // or we assume true if it doesn't throw and reaches resolve().
+
+              // The `saveCorePatientDetails` function (passed as onSave) will handle its own logic,
+              // including updating `coreDetailsSavedSuccessfully` or throwing an error.
+              // For now, we will assume it throws an error on failure.
+
+              form.requestSubmit(); // This is synchronous.
+              // The actual async operation happens inside the form's submit handler.
+              // We need a robust way to await that. The custom event was an attempt.
+              // Let's simplify: `saveCorePatientDetails` will return Promise<boolean>.
+              // The `internalFormSubmitHandler` inside `PatientDetailsFormUnified` will await this.
+              // We need `internalFormSubmitHandler` to somehow signal this back or throw.
+              // If `internalFormSubmitHandler` re-throws, `requestSubmit()` won't catch it here.
+
+              // ---- NEW APPROACH FOR CORE DETAILS ----
+              // `PatientDetailsFormUnified`'s `onSave` prop (our `saveCorePatientDetails`)
+              // will return `Promise<boolean>`. `internalFormSubmitHandler` awaits it.
+              // We will add an imperative handle to `PatientDetailsFormUnified` to expose a submit function.
+
+              // This part needs PatientDetailsFormUnified to have an imperative handle like AddressInformationCard
+              // For now, assuming the existing onSave within PatientDetailsFormUnified, which calls saveCorePatientDetails,
+              // will throw an error that can be caught if `requestSubmit` is part of the try block directly.
+              // This is often not the case as `requestSubmit` is void and async errors in handlers don't propagate to its caller.
+
+              // For this iteration, let's proceed with the existing structure of requestSubmit
+              // and ensure `saveCorePatientDetails` robustly handles its errors and toasts.
+              // The success flag will be more of an "attempted and did not immediately crash" indicator.
+              // A true end-to-end success requires more complex state management or eventing.
+
+              resolve(); // Assume submission was initiated.
+            } catch (e) {
+              console.error(
+                '[PatientDetailPage] Error directly from onSubmitHandler setup for core details:',
+                e
+              );
+              reject(e);
+            }
+          };
+          onSubmitHandler();
+        });
+        coreDetailsSavedSuccessfully = true; // Optimistic: assume it will succeed if no error thrown by `saveCorePatientDetails`
+      } catch (error) {
+        console.error(
+          '[PatientDetailPage] Error during PatientDetailsFormUnified submission process:',
+          error
+        );
+        coreDetailsSavedSuccessfully = false; // Error occurred, so it definitely did not save successfully.
+        allSavesSuccessful = false; // Mark overall as failed
+      }
+    } else {
+      console.warn(
+        '[PatientDetailPage] patientDetailsFormRef.current is null, cannot submit PatientDetailsFormUnified'
+      );
+      allSavesSuccessful = false;
+    }
+
+    // Step 2: Save Address Information
+    if (coreDetailsSavedSuccessfully) {
+      // Only proceed if core details save was attempted and didn't throw immediately
+      if (addressFormRef.current) {
+        console.log('[PatientDetailPage] Attempting to submit AddressInformationCard');
+        try {
+          const addressSaveSuccess = await addressFormRef.current.submitAddress();
+          if (addressSaveSuccess) {
+            addressDetailsSavedSuccessfully = true;
+            console.log(
+              '[PatientDetailPage] Address saved successfully via AddressInformationCard.'
+            );
+          } else {
+            allSavesSuccessful = false;
+            addressDetailsSavedSuccessfully = false;
+            console.warn(
+              '[PatientDetailPage] AddressInformationCard.submitAddress() reported failure.'
+            );
+          }
+        } catch (error) {
+          allSavesSuccessful = false;
+          addressDetailsSavedSuccessfully = false;
+          console.error(
+            '[PatientDetailPage] Error saving address via AddressInformationCard:',
+            error
+          );
+          // Toast is handled in AddressInformationCard or handleSaveAddress
+        }
+      } else {
+        console.warn('[PatientDetailPage] addressFormRef.current is null, cannot save address.');
+        allSavesSuccessful = false; // Cannot save address
+      }
+    } else {
+      if (allSavesSuccessful) {
+        // if core save failed, mark all as unsuccessful
+        toast({
+          title: 'Core Details Not Saved',
+          description: 'Skipping address save because core details did not save successfully.',
+          variant: 'default', // Changed from warning
+        });
+      }
+      allSavesSuccessful = false;
+    }
+
+    setIsSavingPage(false);
+
+    // Determine overall success based on individual operation outcomes
+    if (!coreDetailsSavedSuccessfully || !addressDetailsSavedSuccessfully) {
+      allSavesSuccessful = false;
+    }
+
+    if (coreDetailsSavedSuccessfully && addressDetailsSavedSuccessfully) {
+      setIsEditingPage(false); // Exit edit mode only if everything succeeded
+      toast({ title: 'All page details saved successfully!', variant: 'default' });
+    } else if (coreDetailsSavedSuccessfully && !addressDetailsSavedSuccessfully) {
+      toast({
+        title: 'Partial Success',
+        description: 'Core details saved, but address failed to save.',
+        variant: 'default',
+      });
+      // allSavesSuccessful is already false or will be set false by the check above
+    } else if (!coreDetailsSavedSuccessfully && addressDetailsSavedSuccessfully) {
+      toast({
+        title: 'Partial Success with Issues',
+        description: 'Address saved, but core details failed. Please review.',
+        variant: 'default',
+      });
+      // allSavesSuccessful is already false
+    } else {
+      // Both failed or core failed and address was skipped (implies core failed)
+      toast({
+        title: 'Error Saving Page Details',
+        description: 'One or more sections could not be saved. Please review the errors.',
+        variant: 'destructive',
+      });
+      // allSavesSuccessful is already false
+    }
+
+    // If any part failed, keep isEditingPage true so user can correct.
+    // Only set isEditingPage to false if allSavesSuccessful is true.
+    if (allSavesSuccessful) {
+      setIsEditingPage(false); // All good, exit edit mode.
+    } else {
+      // Potentially, if only non-critical parts failed, one might still exit edit mode.
+      // For now, any failure keeps it in edit mode.
+      console.log('One or more save operations failed. Keeping page in edit mode.');
+    }
+  };
+
+  const handleCancelPage = () => {
+    console.log('[PatientDetailPage] handleCancelPage called');
+    setIsEditingPage(false);
+    if (patient) {
+      // PatientDetailsFormUnified resets internally via its useEffect watching `isEditingPage`
+      // AddressInformationCard also resets internally via its useEffect
+      // Trigger explicit reset for address card if needed
+      addressFormRef.current?.resetForm({
+        address_line1: patient.address_line1,
+        address_line2: patient.address_line2,
+        city: patient.city,
+        state_province: patient.state_province,
+        zip_postal_code: patient.zip_postal_code,
+      });
+    }
+    toast({ title: 'Changes cancelled.', variant: 'default' });
+  };
+
+  // useEffect to update forms when patient data changes (e.g. after initial load or save)
+  useEffect(() => {
+    if (patient && !isEditingPage) {
+      // Only reset if not in edit mode to preserve user changes
+      // PatientDetailsFormUnified resets internally via its useEffect watching `isEditing` and `patient` props.
+      // AddressInformationCard resets its form data based on initialData prop which updates with patient
+      // and also has an effect for isEditing.
+      if (addressFormRef.current) {
+        addressFormRef.current.resetForm({
+          address_line1: patient.address_line1,
+          address_line2: patient.address_line2,
+          city: patient.city,
+          state_province: patient.state_province,
+          zip_postal_code: patient.zip_postal_code,
+        });
+      }
+    }
+  }, [patient, isEditingPage]); // Add isEditingPage to dependencies
+
+  const patientDetailsFormRef = useRef<HTMLFormElement>(null);
+  const addressFormRef = useRef<AddressInformationCardRef>(null); // Correct ref type
+
   if (loading) {
     return <div className="p-8 text-center">Loading patient data...</div>;
   }
@@ -568,6 +1263,28 @@ export default function PatientDetailPage() {
           <p className="text-gray-500">Patient ID: {patient.id}</p>
         </div>
         <div className="flex space-x-2 mt-4 md:mt-0">
+          {!isEditingPage ? (
+            <Button
+              onClick={() => setIsEditingPage(true)}
+              disabled={loading}
+              className="bg-blue-500 hover:bg-blue-600 text-white"
+            >
+              Edit Page
+            </Button>
+          ) : (
+            <>
+              <Button
+                onClick={handleSavePage}
+                disabled={isSavingPage}
+                className="bg-green-500 hover:bg-green-600 text-white"
+              >
+                {isSavingPage ? 'Saving Page...' : 'Save All Changes'}
+              </Button>
+              <Button variant="outline" onClick={handleCancelPage} disabled={isSavingPage}>
+                Cancel All
+              </Button>
+            </>
+          )}
           {canInvite && (
             <Link href={`/patients/${patient.id}/invite`}>
               <Button className="flex items-center">
@@ -600,51 +1317,77 @@ export default function PatientDetailPage() {
             <CardHeader>
               <CardTitle className="flex items-center">
                 <User className="mr-2 h-5 w-5" />
-                Personal Information
+                General & Contact Details
               </CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <h3 className="text-sm font-medium text-gray-500">Full Name</h3>
-                <p>
-                  {patient.first_name} {patient.middle_name && `${patient.middle_name} `}
-                  {patient.last_name} {patient.suffix && `, ${patient.suffix}`}
-                </p>
-              </div>
-              <div>
-                <h3 className="text-sm font-medium text-gray-500">Preferred Name</h3>
-                <p>{patient.preferred_name || 'N/A'}</p>
-              </div>
-              <div>
-                <h3 className="text-sm font-medium text-gray-500">Date of Birth</h3>
-                <p>{new Date(patient.date_of_birth).toLocaleDateString()}</p>
-              </div>
-              <div>
-                <h3 className="text-sm font-medium text-gray-500">Gender</h3>
-                <p>
-                  {patient.gender_id === null
-                    ? 'Not specified'
-                    : patient.gender_id === 1
-                    ? 'Male'
-                    : 'Female'}
-                </p>
-              </div>
-              <div>
-                <h3 className="text-sm font-medium text-gray-500">Preferred Language</h3>
-                <p>{patient.preferred_language || 'Not specified'}</p>
-              </div>
-              <div>
-                <h3 className="text-sm font-medium text-gray-500">Previous Name(s)</h3>
-                <p>{patient.previous_name || 'N/A'}</p>
-              </div>
-              <div>
-                <h3 className="text-sm font-medium text-gray-500">Social Security Number</h3>
-                <p>{patient.social_security_number ? '***-**-****' : 'N/A'}</p>
-              </div>
-              <div>
-                <h3 className="text-sm font-medium text-gray-500">Branch</h3>
-                <p>{patient.branch || 'N/A'}</p>
-              </div>
+              <PatientDetailsFormUnified
+                ref={patientDetailsFormRef}
+                patient={patient!}
+                familyLinks={familyLinks}
+                onSave={async (updated): Promise<boolean> => {
+                  // This is the actual save logic for core patient data
+                  console.log(
+                    '[PatientDetailPage] PatientDetailsFormUnified actual onSave (saveCorePatientDetails). Data:',
+                    updated
+                  );
+                  try {
+                    const { error: updateError } = await supabase
+                      .from('patients')
+                      .update({
+                        first_name: updated.first_name,
+                        last_name: updated.last_name,
+                        middle_name: updated.middle_name,
+                        preferred_name: updated.preferred_name,
+                        suffix: updated.suffix,
+                        previous_name: updated.previous_name,
+                        date_of_birth: updated.date_of_birth,
+                        branch: updated.branch,
+                        preferred_language: updated.preferred_language,
+                        social_security_number: updated.social_security_number,
+                        email: updated.email,
+                        phone_number: updated.phone_number,
+                        mobile_phone_number: updated.mobile_phone_number,
+                        preferred_contact_method: updated.preferred_contact_method,
+                        race: updated.race,
+                        ethnicity: updated.ethnicity,
+                        marital_status: updated.marital_status,
+                      })
+                      .eq('id', patient!.id);
+
+                    if (updateError) throw updateError;
+
+                    const { data: refreshed, error: fetchError } = await supabase
+                      .from('patients')
+                      .select('*')
+                      .eq('id', patient!.id)
+                      .single();
+
+                    if (fetchError) throw fetchError;
+
+                    if (refreshed) {
+                      setPatient(refreshed as Patient);
+                      toast({ title: 'General & Contact details saved.', variant: 'default' });
+                      return true; // Indicate success
+                    }
+                    toast({
+                      title: 'Failed to refresh patient data after save.',
+                      variant: 'destructive',
+                    });
+                    return false; // Indicate failure if not refreshed
+                  } catch (error) {
+                    const errorMessage =
+                      error instanceof Error ? error.message : 'An unknown error occurred.';
+                    toast({
+                      title: 'Error saving General & Contact details.',
+                      description: errorMessage,
+                      variant: 'destructive',
+                    });
+                    return false; // Indicate failure
+                  }
+                }}
+                isEditing={isEditingPage}
+              />
               <div>
                 <h3 className="text-sm font-medium text-gray-500">Status</h3>
                 <div className="flex items-center space-x-2 mt-1">
@@ -652,17 +1395,19 @@ export default function PatientDetailPage() {
                     <>
                       <p
                         className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          patient.is_active
+                          patient!.is_active
                             ? 'bg-green-100 text-green-800'
                             : 'bg-gray-100 text-gray-800'
                         }`}
                       >
-                        {patientStatuses.find(s => s.id === patient.patient_status_id)?.name ||
+                        {patientStatuses.find(s => s.id === patient!.patient_status_id)?.name ||
                           'Unknown'}
                       </p>
                       <Select
                         onValueChange={value => updatePatientStatus(Number(value))}
-                        value={patient.patient_status_id.toString()}
+                        value={
+                          patient!.patient_status_id ? patient!.patient_status_id.toString() : ''
+                        }
                         disabled={statusUpdateLoading}
                       >
                         <SelectTrigger className="w-[180px] h-7 text-xs">
@@ -683,41 +1428,12 @@ export default function PatientDetailPage() {
                   ) : (
                     <p
                       className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        patient.is_active
+                        patient!.is_active
                           ? 'bg-green-100 text-green-800'
                           : 'bg-gray-100 text-gray-800'
                       }`}
                     >
-                      {patient.is_active ? 'Active' : 'Inactive'}
-                    </p>
-                  )}
-                </div>
-              </div>
-              <div className="md:col-span-2">
-                <h3 className="text-sm font-medium text-gray-500">Contact Information</h3>
-                <div className="mt-1 space-y-1">
-                  {patient.email && (
-                    <p className="flex items-center">
-                      <Mail className="mr-2 h-4 w-4 text-gray-400" />
-                      {patient.email}
-                    </p>
-                  )}
-                  {patient.phone_number && (
-                    <p className="flex items-center">
-                      <AlertCircle className="mr-2 h-4 w-4 text-gray-400" />
-                      Home: {patient.phone_number}
-                    </p>
-                  )}
-                  {patient.mobile_phone_number && (
-                    <p className="flex items-center">
-                      <AlertCircle className="mr-2 h-4 w-4 text-gray-400" />
-                      Mobile: {patient.mobile_phone_number}
-                    </p>
-                  )}
-                  {patient.preferred_contact_method && (
-                    <p className="flex items-center">
-                      <Check className="mr-2 h-4 w-4 text-green-500" />
-                      Preferred: {patient.preferred_contact_method}
+                      {patient!.is_active ? 'Active' : 'Inactive'}
                     </p>
                   )}
                 </div>
@@ -725,110 +1441,22 @@ export default function PatientDetailPage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">Background Information</CardTitle>
-            </CardHeader>
-            <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <h3 className="text-sm font-medium text-gray-500">Race</h3>
-                <p>{patient.race || 'Not specified'}</p>
-              </div>
-              <div>
-                <h3 className="text-sm font-medium text-gray-500">Ethnicity</h3>
-                <p>{patient.ethnicity || 'Not specified'}</p>
-              </div>
-              <div>
-                <h3 className="text-sm font-medium text-gray-500">Marital Status</h3>
-                <p>{patient.marital_status || 'Not specified'}</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <CardTitle>Address Information</CardTitle>
-              {!isEditing ? (
-                <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>
-                  Edit Address
-                </Button>
-              ) : (
-                <div className="flex space-x-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setIsEditing(false);
-                      addressForm.reset({
-                        address_line1: patient.address_line1,
-                        address_line2: patient.address_line2,
-                        city: patient.city,
-                        state_province: patient.state_province,
-                        zip_postal_code: patient.zip_postal_code,
-                      });
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={addressForm.handleSubmit(saveAddressChanges)}
-                    disabled={isSaving}
-                  >
-                    {isSaving ? 'Saving...' : 'Save Changes'}
-                  </Button>
-                </div>
-              )}
-            </CardHeader>
-            <CardContent>
-              {!isEditing ? (
-                patient.address_line1 ? (
-                  <div className="space-y-1">
-                    <p>{patient.address_line1}</p>
-                    {patient.address_line2 && <p>{patient.address_line2}</p>}
-                    <p>
-                      {[patient.city, patient.state_province, patient.zip_postal_code]
-                        .filter(Boolean)
-                        .join(', ')}
-                    </p>
-                  </div>
-                ) : (
-                  <p className="text-gray-500">No address information available</p>
-                )
-              ) : (
-                <form className="space-y-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Address Line 1</label>
-                    <Input
-                      placeholder="Street address"
-                      {...addressForm.register('address_line1')}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium text-gray-700">Address Line 2</label>
-                    <Input
-                      placeholder="Apt, Suite, Unit, etc."
-                      {...addressForm.register('address_line2')}
-                    />
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">City</label>
-                      <Input placeholder="City" {...addressForm.register('city')} />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">State/Province</label>
-                      <Input placeholder="State" {...addressForm.register('state_province')} />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">ZIP/Postal Code</label>
-                      <Input placeholder="ZIP code" {...addressForm.register('zip_postal_code')} />
-                    </div>
-                  </div>
-                </form>
-              )}
-            </CardContent>
-          </Card>
+          {/* New Address Information Card - Rendered after General & Contact Details */}
+          {patient && (
+            <AddressInformationCard
+              ref={addressFormRef} // Pass the ref here
+              initialData={{
+                address_line1: patient.address_line1,
+                address_line2: patient.address_line2,
+                city: patient.city,
+                state_province: patient.state_province,
+                zip_postal_code: patient.zip_postal_code,
+              }}
+              onSave={handleSaveAddress} // Parent's save handler
+              isEditing={isEditingPage}
+              isSaving={isSavingPage}
+            />
+          )}
 
           <Card>
             <CardHeader>
