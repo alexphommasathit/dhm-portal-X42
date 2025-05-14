@@ -409,9 +409,7 @@ const PatientDetailsFormUnified = React.forwardRef<HTMLFormElement, PatientDetai
             />
           </div>
           <div>
-            <label className="text-sm font-medium text-gray-700 mb-1">
-              Preferred Contact Method
-            </label>
+            <label className="text-sm font-medium text-gray-700 mb-1">Preferred Method</label>
             <Input
               name="preferred_contact_method"
               value={form.preferred_contact_method}

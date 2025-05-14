@@ -1,17 +1,20 @@
-'use client'
+'use client';
 
-import React, { createContext, useContext, ReactNode, useMemo } from 'react'
-import { useAuth } from './AuthContext'
-import type { Database } from '@/types/supabase'
+import React, { createContext, useContext, ReactNode, useMemo } from 'react';
+import { useAuth } from './AuthContext';
+import type { Database } from '@/types/supabase';
 
 // Define role type from the database schema
-type Role = Database['public']['Enums']['user_role']
+type SupabaseRole = Database['public']['Enums']['user_role'];
+// Temporarily include clinical_administrator until it's in the DB enum
+// Ensure 'clinician' is part of SupabaseRole from your DB if it's to be used.
+type Role = SupabaseRole | 'clinical_administrator';
 
 // Define permission levels for resources
-export type ResourcePermission = 'read' | 'write' | 'admin' | 'none'
+export type ResourcePermission = 'read' | 'write' | 'admin' | 'none';
 
 // Define resources in the application that can be protected
-export type Resource = 
+export type Resource =
   | 'patients'
   | 'staff'
   | 'financial'
@@ -19,18 +22,18 @@ export type Resource =
   | 'reports'
   | 'schedules'
   | 'referrals'
-  | 'billing'
+  | 'billing';
 
 // RBAC context interface
 interface RBACContextType {
-  userRole: Role | null
-  canAccess: (resource: Resource, requiredPermission: ResourcePermission) => boolean
-  isAdmin: boolean
-  allowedResources: Resource[]
+  userRole: Role | null;
+  canAccess: (resource: Resource, requiredPermission: ResourcePermission) => boolean;
+  isAdmin: boolean;
+  allowedResources: Resource[];
 }
 
 // Create context with a default value
-const RBACContext = createContext<RBACContextType | undefined>(undefined)
+const RBACContext = createContext<RBACContextType | undefined>(undefined);
 
 // Role-based permission matrix
 // This maps roles to their permissions for each resource
@@ -49,12 +52,13 @@ const rolePermissions: Record<Role, Partial<Record<Resource, ResourcePermission>
     staff: 'admin',
     schedules: 'admin',
     reports: 'read',
+    patients: 'write',
   },
   financial_admin: {
     financial: 'admin',
     billing: 'admin',
     reports: 'read',
-    patients: 'read',
+    patients: 'write',
   },
   clinician: {
     patients: 'write',
@@ -62,22 +66,28 @@ const rolePermissions: Record<Role, Partial<Record<Resource, ResourcePermission>
     reports: 'write',
     referrals: 'read',
   },
+  clinical_administrator: {
+    patients: 'write',
+    schedules: 'write',
+    reports: 'write',
+    referrals: 'read',
+  },
   assistant: {
-    patients: 'read',
+    patients: 'write',
     schedules: 'read',
     referrals: 'read',
   },
   hha: {
-    patients: 'read',
+    patients: 'write',
     schedules: 'read',
   },
   patient: {
     patients: 'none', // Patients can only see their own data, handled separately
     schedules: 'read',
   },
-  family_caregiver: {
-    patients: 'none', // Family caregivers can only see their related patients, handled separately
-    schedules: 'read',
+  family_contact: {
+    patients: 'none', // Family contacts can only see their related patients, handled separately via RLS
+    schedules: 'read', // Example permission, adjust as needed
   },
   case_manager: {
     patients: 'write',
@@ -87,77 +97,74 @@ const rolePermissions: Record<Role, Partial<Record<Resource, ResourcePermission>
   },
   referral_source: {
     referrals: 'write',
+    patients: 'write',
   },
   unassigned: {
     // No access to any resources
   },
-}
+};
 
 // Defines which roles are considered administrative
-const adminRoles: Role[] = ['administrator', 'hr_admin']
+const adminRoles: Role[] = ['administrator', 'hr_admin'];
 
 interface RBACProviderProps {
-  children: ReactNode
+  children: ReactNode;
 }
 
 export function RBACProvider({ children }: RBACProviderProps) {
-  const { profile } = useAuth()
-  
+  const { profile } = useAuth();
+
   // User's current role
-  const userRole = profile?.role || null
-  
+  const userRole = profile?.role || null;
+
   // Determine if the user has admin access
-  const isAdmin = userRole ? adminRoles.includes(userRole) : false
-  
+  const isAdmin = userRole ? adminRoles.includes(userRole) : false;
+
   // Get the list of all resources the user can access
   const allowedResources = useMemo(() => {
-    if (!userRole) return []
-    
-    const permissions = rolePermissions[userRole]
+    if (!userRole) return [];
+
+    const permissions = rolePermissions[userRole];
     return Object.entries(permissions)
-      .filter(([_, permission]) => permission !== 'none')
-      .map(([resource]) => resource as Resource)
-  }, [userRole])
-  
+      .filter(([, permission]) => permission !== 'none')
+      .map(([resource]) => resource as Resource);
+  }, [userRole]);
+
   // Function to check if a user has access to a specific resource
   const canAccess = (resource: Resource, requiredPermission: ResourcePermission): boolean => {
     // No access if no role is assigned
-    if (!userRole) return false
-    
+    if (!userRole) return false;
+
     // Get the user's permission level for the resource
-    const userPermission = rolePermissions[userRole][resource] || 'none'
-    
+    const userPermission = rolePermissions[userRole][resource] || 'none';
+
     // Permission hierarchy: admin > write > read > none
     const permissionHierarchy: Record<ResourcePermission, number> = {
-      'admin': 3,
-      'write': 2,
-      'read': 1,
-      'none': 0
-    }
-    
+      admin: 3,
+      write: 2,
+      read: 1,
+      none: 0,
+    };
+
     // Check if the user's permission level is sufficient
-    return permissionHierarchy[userPermission] >= permissionHierarchy[requiredPermission]
-  }
-  
+    return permissionHierarchy[userPermission] >= permissionHierarchy[requiredPermission];
+  };
+
   const value = {
     userRole,
     canAccess,
     isAdmin,
     allowedResources,
-  }
-  
-  return (
-    <RBACContext.Provider value={value}>
-      {children}
-    </RBACContext.Provider>
-  )
+  };
+
+  return <RBACContext.Provider value={value}>{children}</RBACContext.Provider>;
 }
 
 // Custom hook to use the RBAC context
 export function useRBAC() {
-  const context = useContext(RBACContext)
+  const context = useContext(RBACContext);
   if (context === undefined) {
-    throw new Error('useRBAC must be used within an RBACProvider')
+    throw new Error('useRBAC must be used within an RBACProvider');
   }
-  return context
-} 
+  return context;
+}
