@@ -40,6 +40,12 @@ CREATE POLICY workflow_templates_update_policy ON workflow_templates
 CREATE POLICY workflow_templates_delete_policy ON workflow_templates
     FOR DELETE USING (true);
 
+-- Apply the trigger to the workflow_templates table for updated_at
+CREATE TRIGGER on_workflow_templates_updated
+BEFORE UPDATE ON workflow_templates
+FOR EACH ROW
+EXECUTE FUNCTION public.handle_updated_at();
+
 -- Create policies for task_templates
 -- Allow all authenticated users to view task templates
 CREATE POLICY task_templates_select_policy ON task_templates
@@ -54,6 +60,12 @@ CREATE POLICY task_templates_update_policy ON task_templates
 
 CREATE POLICY task_templates_delete_policy ON task_templates
     FOR DELETE USING (true);
+
+-- Apply the trigger to the task_templates table for updated_at
+CREATE TRIGGER on_task_templates_updated
+BEFORE UPDATE ON task_templates
+FOR EACH ROW
+EXECUTE FUNCTION public.handle_updated_at();
 
 -- Create index for performance
 CREATE INDEX idx_task_templates_workflow_id ON task_templates(workflow_template_id);
