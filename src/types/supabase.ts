@@ -1,6 +1,31 @@
 export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export type Database = {
+  graphql_public: {
+    Tables: {
+      [_ in never]: never;
+    };
+    Views: {
+      [_ in never]: never;
+    };
+    Functions: {
+      graphql: {
+        Args: {
+          operationName?: string;
+          query?: string;
+          variables?: Json;
+          extensions?: Json;
+        };
+        Returns: Json;
+      };
+    };
+    Enums: {
+      [_ in never]: never;
+    };
+    CompositeTypes: {
+      [_ in never]: never;
+    };
+  };
   public: {
     Tables: {
       appointments: {
@@ -9,11 +34,17 @@ export type Database = {
           created_at: string;
           created_by: string | null;
           duration_minutes: number | null;
+          google_calendar_event_id: string | null;
+          ics_uid: string | null;
           id: string;
+          is_all_day: boolean | null;
+          last_synced_at: string | null;
           location: string | null;
+          needs_sync: boolean | null;
           notes: string | null;
           patient_id: string;
           practitioner_name: string | null;
+          recurrence_rule: string | null;
           service_type: string | null;
           status: string;
           updated_at: string;
@@ -23,11 +54,17 @@ export type Database = {
           created_at?: string;
           created_by?: string | null;
           duration_minutes?: number | null;
+          google_calendar_event_id?: string | null;
+          ics_uid?: string | null;
           id?: string;
+          is_all_day?: boolean | null;
+          last_synced_at?: string | null;
           location?: string | null;
+          needs_sync?: boolean | null;
           notes?: string | null;
           patient_id: string;
           practitioner_name?: string | null;
+          recurrence_rule?: string | null;
           service_type?: string | null;
           status?: string;
           updated_at?: string;
@@ -37,11 +74,17 @@ export type Database = {
           created_at?: string;
           created_by?: string | null;
           duration_minutes?: number | null;
+          google_calendar_event_id?: string | null;
+          ics_uid?: string | null;
           id?: string;
+          is_all_day?: boolean | null;
+          last_synced_at?: string | null;
           location?: string | null;
+          needs_sync?: boolean | null;
           notes?: string | null;
           patient_id?: string;
           practitioner_name?: string | null;
+          recurrence_rule?: string | null;
           service_type?: string | null;
           status?: string;
           updated_at?: string;
@@ -63,110 +106,284 @@ export type Database = {
           }
         ];
       };
-      audit_logs: {
+      credentials: {
         Row: {
-          action: string;
           created_at: string;
-          details: Json;
+          credential_name: string;
+          credential_number: string | null;
+          credential_type: Database['public']['Enums']['credential_type_enum'];
+          document_file_path: string | null;
+          employee_id: string;
+          expiry_date: string | null;
           id: string;
-          ip_address: string | null;
-          resource_id: string | null;
-          resource_type: string;
-          success: boolean;
-          timestamp: string;
-          user_agent: string | null;
-          user_id: string;
+          issue_date: string | null;
+          issuing_body: string | null;
+          status: Database['public']['Enums']['credential_status_enum'];
+          updated_at: string;
+          verified_at: string | null;
+          verified_by_user_id: string | null;
         };
         Insert: {
-          action: string;
           created_at?: string;
-          details?: Json;
+          credential_name: string;
+          credential_number?: string | null;
+          credential_type: Database['public']['Enums']['credential_type_enum'];
+          document_file_path?: string | null;
+          employee_id: string;
+          expiry_date?: string | null;
           id?: string;
-          ip_address?: string | null;
-          resource_id?: string | null;
-          resource_type: string;
-          success?: boolean;
-          timestamp?: string;
-          user_agent?: string | null;
-          user_id: string;
+          issue_date?: string | null;
+          issuing_body?: string | null;
+          status?: Database['public']['Enums']['credential_status_enum'];
+          updated_at?: string;
+          verified_at?: string | null;
+          verified_by_user_id?: string | null;
         };
         Update: {
-          action?: string;
           created_at?: string;
-          details?: Json;
+          credential_name?: string;
+          credential_number?: string | null;
+          credential_type?: Database['public']['Enums']['credential_type_enum'];
+          document_file_path?: string | null;
+          employee_id?: string;
+          expiry_date?: string | null;
           id?: string;
-          ip_address?: string | null;
-          resource_id?: string | null;
-          resource_type?: string;
-          success?: boolean;
-          timestamp?: string;
-          user_agent?: string | null;
-          user_id?: string;
+          issue_date?: string | null;
+          issuing_body?: string | null;
+          status?: Database['public']['Enums']['credential_status_enum'];
+          updated_at?: string;
+          verified_at?: string | null;
+          verified_by_user_id?: string | null;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: 'credentials_employee_id_fkey';
+            columns: ['employee_id'];
+            isOneToOne: false;
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          }
+        ];
       };
-      languages: {
+      document_templates: {
         Row: {
-          id: number;
-          is_active: boolean;
-          iso_code_639_1: string | null;
-          name: string;
+          created_at: string;
+          created_by: string | null;
+          description: string | null;
+          document_type: Database['public']['Enums']['document_type'];
+          file_mime_type: string | null;
+          file_storage_path: string;
+          form_fields: Json | null;
+          id: string;
+          is_active: boolean | null;
+          requires_signature: boolean | null;
+          template_name: string;
+          updated_at: string;
         };
         Insert: {
-          id?: number;
-          is_active?: boolean;
-          iso_code_639_1?: string | null;
-          name: string;
+          created_at?: string;
+          created_by?: string | null;
+          description?: string | null;
+          document_type: Database['public']['Enums']['document_type'];
+          file_mime_type?: string | null;
+          file_storage_path: string;
+          form_fields?: Json | null;
+          id?: string;
+          is_active?: boolean | null;
+          requires_signature?: boolean | null;
+          template_name: string;
+          updated_at?: string;
         };
         Update: {
-          id?: number;
-          is_active?: boolean;
-          iso_code_639_1?: string | null;
-          name?: string;
+          created_at?: string;
+          created_by?: string | null;
+          description?: string | null;
+          document_type?: Database['public']['Enums']['document_type'];
+          file_mime_type?: string | null;
+          file_storage_path?: string;
+          form_fields?: Json | null;
+          id?: string;
+          is_active?: boolean | null;
+          requires_signature?: boolean | null;
+          template_name?: string;
+          updated_at?: string;
         };
-        Relationships: [];
+        Relationships: [
+          {
+            foreignKeyName: 'document_templates_created_by_fkey';
+            columns: ['created_by'];
+            isOneToOne: false;
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          }
+        ];
+      };
+      employee_documents: {
+        Row: {
+          created_at: string;
+          document_name: string;
+          document_type: Database['public']['Enums']['document_type_enum'];
+          employee_id: string;
+          file_path: string;
+          id: string;
+          updated_at: string;
+          uploaded_by_user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          document_name: string;
+          document_type: Database['public']['Enums']['document_type_enum'];
+          employee_id: string;
+          file_path: string;
+          id?: string;
+          updated_at?: string;
+          uploaded_by_user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          document_name?: string;
+          document_type?: Database['public']['Enums']['document_type_enum'];
+          employee_id?: string;
+          file_path?: string;
+          id?: string;
+          updated_at?: string;
+          uploaded_by_user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'employee_documents_employee_id_fkey';
+            columns: ['employee_id'];
+            isOneToOne: false;
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          }
+        ];
+      };
+      onboarding_tasks: {
+        Row: {
+          assigned_to_role: Database['public']['Enums']['user_role'];
+          completed_at: string | null;
+          created_at: string;
+          due_date: string | null;
+          employee_id: string;
+          id: string;
+          notes: string | null;
+          required_document_type: Database['public']['Enums']['document_type_enum'] | null;
+          status: Database['public']['Enums']['onboarding_task_status_enum'];
+          task_description: string | null;
+          task_name: string;
+          updated_at: string;
+        };
+        Insert: {
+          assigned_to_role: Database['public']['Enums']['user_role'];
+          completed_at?: string | null;
+          created_at?: string;
+          due_date?: string | null;
+          employee_id: string;
+          id?: string;
+          notes?: string | null;
+          required_document_type?: Database['public']['Enums']['document_type_enum'] | null;
+          status?: Database['public']['Enums']['onboarding_task_status_enum'];
+          task_description?: string | null;
+          task_name: string;
+          updated_at?: string;
+        };
+        Update: {
+          assigned_to_role?: Database['public']['Enums']['user_role'];
+          completed_at?: string | null;
+          created_at?: string;
+          due_date?: string | null;
+          employee_id?: string;
+          id?: string;
+          notes?: string | null;
+          required_document_type?: Database['public']['Enums']['document_type_enum'] | null;
+          status?: Database['public']['Enums']['onboarding_task_status_enum'];
+          task_description?: string | null;
+          task_name?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'onboarding_tasks_employee_id_fkey';
+            columns: ['employee_id'];
+            isOneToOne: false;
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          }
+        ];
       };
       patient_documents: {
         Row: {
           created_at: string;
+          created_by: string | null;
           description: string | null;
           document_name: string;
-          document_type: string | null;
+          document_status: Database['public']['Enums']['document_status'];
+          document_type: Database['public']['Enums']['document_type'];
           file_mime_type: string | null;
+          file_size: number;
           file_storage_path: string;
           id: string;
+          is_template: boolean | null;
+          metadata: Json | null;
+          original_filename: string | null;
           patient_id: string;
+          requires_signature: boolean | null;
+          signed_at: string | null;
+          signed_by: string | null;
           updated_at: string;
-          uploaded_at: string;
-          uploaded_by: string | null;
+          version: number | null;
         };
         Insert: {
           created_at?: string;
+          created_by?: string | null;
           description?: string | null;
           document_name: string;
-          document_type?: string | null;
+          document_status?: Database['public']['Enums']['document_status'];
+          document_type: Database['public']['Enums']['document_type'];
           file_mime_type?: string | null;
+          file_size: number;
           file_storage_path: string;
           id?: string;
+          is_template?: boolean | null;
+          metadata?: Json | null;
+          original_filename?: string | null;
           patient_id: string;
+          requires_signature?: boolean | null;
+          signed_at?: string | null;
+          signed_by?: string | null;
           updated_at?: string;
-          uploaded_at?: string;
-          uploaded_by?: string | null;
+          version?: number | null;
         };
         Update: {
           created_at?: string;
+          created_by?: string | null;
           description?: string | null;
           document_name?: string;
-          document_type?: string | null;
+          document_status?: Database['public']['Enums']['document_status'];
+          document_type?: Database['public']['Enums']['document_type'];
           file_mime_type?: string | null;
+          file_size?: number;
           file_storage_path?: string;
           id?: string;
+          is_template?: boolean | null;
+          metadata?: Json | null;
+          original_filename?: string | null;
           patient_id?: string;
+          requires_signature?: boolean | null;
+          signed_at?: string | null;
+          signed_by?: string | null;
           updated_at?: string;
-          uploaded_at?: string;
-          uploaded_by?: string | null;
+          version?: number | null;
         };
         Relationships: [
+          {
+            foreignKeyName: 'patient_documents_created_by_fkey';
+            columns: ['created_by'];
+            isOneToOne: false;
+            referencedRelation: 'profiles';
+            referencedColumns: ['id'];
+          },
           {
             foreignKeyName: 'patient_documents_patient_id_fkey';
             columns: ['patient_id'];
@@ -175,8 +392,8 @@ export type Database = {
             referencedColumns: ['id'];
           },
           {
-            foreignKeyName: 'patient_documents_uploaded_by_fkey';
-            columns: ['uploaded_by'];
+            foreignKeyName: 'patient_documents_signed_by_fkey';
+            columns: ['signed_by'];
             isOneToOne: false;
             referencedRelation: 'profiles';
             referencedColumns: ['id'];
@@ -192,8 +409,7 @@ export type Database = {
           is_designated_representative: boolean;
           is_emergency_contact: boolean;
           patient_id: string;
-          relationship: string;
-          relationship_type: string | null;
+          relationship: string | null;
           updated_at: string;
         };
         Insert: {
@@ -204,8 +420,7 @@ export type Database = {
           is_designated_representative?: boolean;
           is_emergency_contact?: boolean;
           patient_id: string;
-          relationship: string;
-          relationship_type?: string | null;
+          relationship?: string | null;
           updated_at?: string;
         };
         Update: {
@@ -216,8 +431,7 @@ export type Database = {
           is_designated_representative?: boolean;
           is_emergency_contact?: boolean;
           patient_id?: string;
-          relationship?: string;
-          relationship_type?: string | null;
+          relationship?: string | null;
           updated_at?: string;
         };
         Relationships: [
@@ -230,65 +444,6 @@ export type Database = {
           },
           {
             foreignKeyName: 'patient_family_links_patient_id_fkey';
-            columns: ['patient_id'];
-            isOneToOne: false;
-            referencedRelation: 'patients';
-            referencedColumns: ['id'];
-          }
-        ];
-      };
-      patient_genders: {
-        Row: {
-          code: string | null;
-          display_order: number | null;
-          id: number;
-          is_active: boolean;
-          name: string;
-        };
-        Insert: {
-          code?: string | null;
-          display_order?: number | null;
-          id?: number;
-          is_active?: boolean;
-          name: string;
-        };
-        Update: {
-          code?: string | null;
-          display_order?: number | null;
-          id?: number;
-          is_active?: boolean;
-          name?: string;
-        };
-        Relationships: [];
-      };
-      patient_notes: {
-        Row: {
-          created_at: string;
-          created_by: string | null;
-          id: string;
-          note_text: string;
-          patient_id: string;
-          updated_at: string;
-        };
-        Insert: {
-          created_at?: string;
-          created_by?: string | null;
-          id?: string;
-          note_text: string;
-          patient_id: string;
-          updated_at?: string;
-        };
-        Update: {
-          created_at?: string;
-          created_by?: string | null;
-          id?: string;
-          note_text?: string;
-          patient_id?: string;
-          updated_at?: string;
-        };
-        Relationships: [
-          {
-            foreignKeyName: 'patient_notes_patient_id_fkey';
             columns: ['patient_id'];
             isOneToOne: false;
             referencedRelation: 'patients';
@@ -365,22 +520,25 @@ export type Database = {
       };
       patient_statuses: {
         Row: {
+          created_at: string;
           description: string | null;
           id: number;
-          is_active: boolean;
           name: string;
+          updated_at: string;
         };
         Insert: {
+          created_at?: string;
           description?: string | null;
           id?: number;
-          is_active?: boolean;
           name: string;
+          updated_at?: string;
         };
         Update: {
+          created_at?: string;
           description?: string | null;
           id?: number;
-          is_active?: boolean;
           name?: string;
+          updated_at?: string;
         };
         Relationships: [];
       };
@@ -388,125 +546,102 @@ export type Database = {
         Row: {
           address_line1: string | null;
           address_line2: string | null;
+          branch: string | null;
           city: string | null;
-          country: string;
           created_at: string;
-          created_by: string | null;
           date_of_birth: string;
-          deceased_date: string | null;
-          ehr_patient_id: string | null;
           email: string | null;
-          emergency_contact_email: string | null;
-          emergency_contact_name: string | null;
-          emergency_contact_phone: string | null;
-          emergency_contact_relationship: string | null;
+          ethnicity: string | null;
           first_name: string;
-          gender_id: number | null;
+          gender: string | null;
           id: string;
           is_active: boolean;
           last_name: string;
-          medical_record_number: string | null;
+          marital_status: string | null;
           middle_name: string | null;
-          notes: string | null;
-          patient_status_id: number;
+          mobile_phone_number: string | null;
+          patient_status_id: number | null;
           phone_number: string | null;
-          phone_number_type: string | null;
-          preferred_language_id: number | null;
+          preferred_contact_method: string | null;
+          preferred_language: string | null;
           preferred_name: string | null;
+          previous_name: string | null;
           profile_id: string | null;
-          state_province: string | null;
+          race: string | null;
+          social_security_number: string | null;
+          state: string | null;
+          suffix: string | null;
           updated_at: string;
-          updated_by: string | null;
-          zip_postal_code: string | null;
+          zip_code: string | null;
         };
         Insert: {
           address_line1?: string | null;
           address_line2?: string | null;
+          branch?: string | null;
           city?: string | null;
-          country?: string;
           created_at?: string;
-          created_by?: string | null;
           date_of_birth: string;
-          deceased_date?: string | null;
-          ehr_patient_id?: string | null;
           email?: string | null;
-          emergency_contact_email?: string | null;
-          emergency_contact_name?: string | null;
-          emergency_contact_phone?: string | null;
-          emergency_contact_relationship?: string | null;
+          ethnicity?: string | null;
           first_name: string;
-          gender_id?: number | null;
+          gender?: string | null;
           id?: string;
           is_active?: boolean;
           last_name: string;
-          medical_record_number?: string | null;
+          marital_status?: string | null;
           middle_name?: string | null;
-          notes?: string | null;
-          patient_status_id?: number;
+          mobile_phone_number?: string | null;
+          patient_status_id?: number | null;
           phone_number?: string | null;
-          phone_number_type?: string | null;
-          preferred_language_id?: number | null;
+          preferred_contact_method?: string | null;
+          preferred_language?: string | null;
           preferred_name?: string | null;
+          previous_name?: string | null;
           profile_id?: string | null;
-          state_province?: string | null;
+          race?: string | null;
+          social_security_number?: string | null;
+          state?: string | null;
+          suffix?: string | null;
           updated_at?: string;
-          updated_by?: string | null;
-          zip_postal_code?: string | null;
+          zip_code?: string | null;
         };
         Update: {
           address_line1?: string | null;
           address_line2?: string | null;
+          branch?: string | null;
           city?: string | null;
-          country?: string;
           created_at?: string;
-          created_by?: string | null;
           date_of_birth?: string;
-          deceased_date?: string | null;
-          ehr_patient_id?: string | null;
           email?: string | null;
-          emergency_contact_email?: string | null;
-          emergency_contact_name?: string | null;
-          emergency_contact_phone?: string | null;
-          emergency_contact_relationship?: string | null;
+          ethnicity?: string | null;
           first_name?: string;
-          gender_id?: number | null;
+          gender?: string | null;
           id?: string;
           is_active?: boolean;
           last_name?: string;
-          medical_record_number?: string | null;
+          marital_status?: string | null;
           middle_name?: string | null;
-          notes?: string | null;
-          patient_status_id?: number;
+          mobile_phone_number?: string | null;
+          patient_status_id?: number | null;
           phone_number?: string | null;
-          phone_number_type?: string | null;
-          preferred_language_id?: number | null;
+          preferred_contact_method?: string | null;
+          preferred_language?: string | null;
           preferred_name?: string | null;
+          previous_name?: string | null;
           profile_id?: string | null;
-          state_province?: string | null;
+          race?: string | null;
+          social_security_number?: string | null;
+          state?: string | null;
+          suffix?: string | null;
           updated_at?: string;
-          updated_by?: string | null;
-          zip_postal_code?: string | null;
+          zip_code?: string | null;
         };
         Relationships: [
-          {
-            foreignKeyName: 'patients_gender_id_fkey';
-            columns: ['gender_id'];
-            isOneToOne: false;
-            referencedRelation: 'patient_genders';
-            referencedColumns: ['id'];
-          },
           {
             foreignKeyName: 'patients_patient_status_id_fkey';
             columns: ['patient_status_id'];
             isOneToOne: false;
             referencedRelation: 'patient_statuses';
-            referencedColumns: ['id'];
-          },
-          {
-            foreignKeyName: 'patients_preferred_language_id_fkey';
-            columns: ['preferred_language_id'];
-            isOneToOne: false;
-            referencedRelation: 'languages';
             referencedColumns: ['id'];
           },
           {
@@ -518,121 +653,50 @@ export type Database = {
           }
         ];
       };
-      policy_chunks: {
-        Row: {
-          chunk_index: number;
-          chunk_text: string;
-          created_at: string;
-          document_id: string;
-          embedding: string | null;
-          fts: unknown | null;
-          id: string;
-          metadata: Json | null;
-        };
-        Insert: {
-          chunk_index: number;
-          chunk_text: string;
-          created_at?: string;
-          document_id: string;
-          embedding?: string | null;
-          fts?: unknown | null;
-          id?: string;
-          metadata?: Json | null;
-        };
-        Update: {
-          chunk_index?: number;
-          chunk_text?: string;
-          created_at?: string;
-          document_id?: string;
-          embedding?: string | null;
-          fts?: unknown | null;
-          id?: string;
-          metadata?: Json | null;
-        };
-        Relationships: [
-          {
-            foreignKeyName: 'policy_chunks_document_id_fkey';
-            columns: ['document_id'];
-            isOneToOne: false;
-            referencedRelation: 'policy_documents';
-            referencedColumns: ['id'];
-          }
-        ];
-      };
-      policy_documents: {
-        Row: {
-          created_at: string;
-          created_by: string;
-          description: string | null;
-          effective_date: string | null;
-          file_name: string;
-          file_path: string;
-          file_size: number;
-          file_type: string;
-          id: string;
-          review_date: string | null;
-          status: string;
-          title: string;
-          updated_at: string;
-          updated_by: string;
-          version: string | null;
-        };
-        Insert: {
-          created_at?: string;
-          created_by: string;
-          description?: string | null;
-          effective_date?: string | null;
-          file_name: string;
-          file_path: string;
-          file_size: number;
-          file_type: string;
-          id?: string;
-          review_date?: string | null;
-          status?: string;
-          title: string;
-          updated_at?: string;
-          updated_by: string;
-          version?: string | null;
-        };
-        Update: {
-          created_at?: string;
-          created_by?: string;
-          description?: string | null;
-          effective_date?: string | null;
-          file_name?: string;
-          file_path?: string;
-          file_size?: number;
-          file_type?: string;
-          id?: string;
-          review_date?: string | null;
-          status?: string;
-          title?: string;
-          updated_at?: string;
-          updated_by?: string;
-          version?: string | null;
-        };
-        Relationships: [];
-      };
       profiles: {
         Row: {
-          first_name: string | null;
+          birthdate: string | null;
+          created_at: string;
+          email: string;
+          first_name: string;
+          full_name: string | null;
+          gender: string | null;
           id: string;
-          last_name: string | null;
+          job_title: string | null;
+          last_name: string;
+          preferred_name: string | null;
           role: Database['public']['Enums']['user_role'];
+          committees: string | null;
           updated_at: string;
         };
         Insert: {
-          first_name?: string | null;
-          id: string;
-          last_name?: string | null;
+          birthdate?: string | null;
+          created_at?: string;
+          email: string;
+          first_name: string;
+          full_name?: string | null;
+          gender?: string | null;
+          id?: string;
+          job_title?: string | null;
+          last_name: string;
+          preferred_name?: string | null;
           role?: Database['public']['Enums']['user_role'];
+          committees?: string | null;
           updated_at?: string;
         };
         Update: {
-          first_name?: string | null;
+          birthdate?: string | null;
+          created_at?: string;
+          email?: string;
+          first_name?: string;
+          full_name?: string | null;
+          gender?: string | null;
           id?: string;
-          last_name?: string | null;
+          job_title?: string | null;
+          last_name?: string;
+          preferred_name?: string | null;
           role?: Database['public']['Enums']['user_role'];
+          committees?: string | null;
           updated_at?: string;
         };
         Relationships: [];
@@ -681,36 +745,6 @@ export type Database = {
           }
         ];
       };
-      user_permissions: {
-        Row: {
-          created_at: string;
-          id: string;
-          permission_type: string;
-          resource_id: string | null;
-          resource_type: string;
-          updated_at: string;
-          user_id: string;
-        };
-        Insert: {
-          created_at?: string;
-          id?: string;
-          permission_type: string;
-          resource_id?: string | null;
-          resource_type: string;
-          updated_at?: string;
-          user_id: string;
-        };
-        Update: {
-          created_at?: string;
-          id?: string;
-          permission_type?: string;
-          resource_id?: string | null;
-          resource_type?: string;
-          updated_at?: string;
-          user_id?: string;
-        };
-        Relationships: [];
-      };
       workflow_templates: {
         Row: {
           created_at: string | null;
@@ -740,6 +774,44 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      accept_patient_portal_invitation: {
+        Args: { p_token: string };
+        Returns: boolean;
+      };
+      create_appointment: {
+        Args: {
+          p_patient_id: string;
+          p_appointment_datetime: string;
+          p_duration_minutes?: number;
+          p_service_type?: string;
+          p_practitioner_name?: string;
+          p_location?: string;
+          p_notes?: string;
+          p_status?: string;
+          p_is_all_day?: boolean;
+          p_recurrence_rule?: string;
+        };
+        Returns: string;
+      };
+      create_document_from_template: {
+        Args: {
+          p_patient_id: string;
+          p_template_id: string;
+          p_document_name?: string;
+          p_document_status?: string;
+          p_form_data?: Json;
+        };
+        Returns: string;
+      };
+      create_family_member_profile: {
+        Args: {
+          p_first_name: string;
+          p_last_name: string;
+          p_email: string;
+          p_phone: string;
+        };
+        Returns: string;
+      };
       create_patient: {
         Args: {
           p_first_name: string;
@@ -758,82 +830,32 @@ export type Database = {
         Returns: {
           id: string;
           profile_id: string;
-          ehr_patient_id: string;
-          medical_record_number: string;
           first_name: string;
-          middle_name: string;
           last_name: string;
-          preferred_name: string;
           date_of_birth: string;
-          gender_id: number;
-          email: string;
+          gender: string;
           phone_number: string;
-          phone_number_type: string;
+          email: string;
           address_line1: string;
           address_line2: string;
           city: string;
-          state_province: string;
-          zip_postal_code: string;
-          country: string;
-          emergency_contact_name: string;
-          emergency_contact_phone: string;
-          emergency_contact_email: string;
-          emergency_contact_relationship: string;
-          patient_status_id: number;
-          is_active: boolean;
-          deceased_date: string;
-          preferred_language_id: number;
-          notes: string;
+          state: string;
+          zip_code: string;
           created_at: string;
           updated_at: string;
-          created_by: string;
-          updated_by: string;
         }[];
       };
-      create_family_member_profile: {
-        Args: {
-          p_first_name: string;
-          p_last_name: string;
-          p_email?: string | null;
-          p_phone?: string | null;
-        };
-        Returns: string; // UUID as string
+      delete_appointment: {
+        Args: { p_appointment_id: string };
+        Returns: boolean;
       };
-      fts_policy_chunks: {
-        Args: { query_text: string; match_count?: number };
-        Returns: {
-          id: string;
-          document_id: string;
-          chunk_index: number;
-          chunk_text: string;
-          rank: number;
-          document_title: string;
-          document_status: string;
-        }[];
+      delete_patient_document: {
+        Args: { p_document_id: string };
+        Returns: boolean;
       };
-      get_available_functions: {
-        Args: Record<PropertyKey, never>;
-        Returns: {
-          schema: string;
-          name: string;
-          result_data_type: string;
-          argument_data_types: string;
-          type: string;
-          security: string;
-        }[];
-      };
-      get_family_links_for_patient: {
-        Args: { p_patient_id: string };
-        Returns: {
-          link_id: string;
-          relationship: string;
-          is_active: boolean;
-          is_emergency_contact: boolean;
-          is_designated_representative: boolean;
-          profile_first_name: string;
-          profile_last_name: string;
-          profile_role: string;
-        }[];
+      generate_appointment_ics: {
+        Args: { p_appointment_id: string };
+        Returns: string;
       };
       get_all_family_links_for_patient: {
         Args: { p_patient_id: string };
@@ -846,66 +868,331 @@ export type Database = {
           profile_first_name: string;
           profile_last_name: string;
           profile_role: string;
+          profile_email: string;
+          profile_phone: string;
         }[];
       };
-      get_my_profile: {
+      get_appointments_needing_sync: {
         Args: Record<PropertyKey, never>;
         Returns: {
-          first_name: string | null;
+          appointment_datetime: string;
+          created_at: string;
+          created_by: string | null;
+          duration_minutes: number | null;
+          google_calendar_event_id: string | null;
+          ics_uid: string | null;
           id: string;
-          last_name: string | null;
-          role: Database['public']['Enums']['user_role'];
+          is_all_day: boolean | null;
+          last_synced_at: string | null;
+          location: string | null;
+          needs_sync: boolean | null;
+          notes: string | null;
+          patient_id: string;
+          practitioner_name: string | null;
+          recurrence_rule: string | null;
+          service_type: string | null;
+          status: string;
           updated_at: string;
         }[];
       };
-      get_patient_by_id: {
+      get_invitation_details: {
+        Args: { p_token: string };
+        Returns: {
+          id: string;
+          patient_id: string;
+          email: string;
+          role: string;
+          patient_first_name: string;
+          patient_last_name: string;
+          expires_at: string;
+          status: string;
+        }[];
+      };
+      get_patient_details: {
         Args: { p_patient_id: string };
-        Returns: Json;
+        Returns: {
+          address_line1: string | null;
+          address_line2: string | null;
+          branch: string | null;
+          city: string | null;
+          created_at: string;
+          date_of_birth: string;
+          email: string | null;
+          ethnicity: string | null;
+          first_name: string;
+          gender: string | null;
+          id: string;
+          is_active: boolean;
+          last_name: string;
+          marital_status: string | null;
+          middle_name: string | null;
+          mobile_phone_number: string | null;
+          patient_status_id: number | null;
+          phone_number: string | null;
+          preferred_contact_method: string | null;
+          preferred_language: string | null;
+          preferred_name: string | null;
+          previous_name: string | null;
+          profile_id: string | null;
+          race: string | null;
+          social_security_number: string | null;
+          state: string | null;
+          suffix: string | null;
+          updated_at: string;
+          zip_code: string | null;
+        }[];
+      };
+      get_patient_list: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          address_line1: string | null;
+          address_line2: string | null;
+          branch: string | null;
+          city: string | null;
+          created_at: string;
+          date_of_birth: string;
+          email: string | null;
+          ethnicity: string | null;
+          first_name: string;
+          gender: string | null;
+          id: string;
+          is_active: boolean;
+          last_name: string;
+          marital_status: string | null;
+          middle_name: string | null;
+          mobile_phone_number: string | null;
+          patient_status_id: number | null;
+          phone_number: string | null;
+          preferred_contact_method: string | null;
+          preferred_language: string | null;
+          preferred_name: string | null;
+          previous_name: string | null;
+          profile_id: string | null;
+          race: string | null;
+          social_security_number: string | null;
+          state: string | null;
+          suffix: string | null;
+          updated_at: string;
+          zip_code: string | null;
+        }[];
+      };
+      get_patient_upcoming_appointments: {
+        Args: { p_patient_id: string; p_days_ahead?: number };
+        Returns: {
+          appointment_datetime: string;
+          created_at: string;
+          created_by: string | null;
+          duration_minutes: number | null;
+          google_calendar_event_id: string | null;
+          ics_uid: string | null;
+          id: string;
+          is_all_day: boolean | null;
+          last_synced_at: string | null;
+          location: string | null;
+          needs_sync: boolean | null;
+          notes: string | null;
+          patient_id: string;
+          practitioner_name: string | null;
+          recurrence_rule: string | null;
+          service_type: string | null;
+          status: string;
+          updated_at: string;
+        }[];
       };
       invite_patient_portal_access: {
         Args: {
           p_patient_id: string;
-          p_email: string;
-          p_role: string;
+          p_invitee_email: string;
+          p_invited_as_role: Database['public']['Enums']['user_role'];
           p_expiry_days?: number;
         };
-        Returns: string; // UUID is returned as string
+        Returns: string;
       };
-      match_policy_chunks: {
+      is_linked_family_contact_for_patient: {
+        Args: { p_patient_id: string; p_user_id: string };
+        Returns: boolean;
+      };
+      reschedule_appointment: {
         Args: {
-          query_embedding: string;
-          match_threshold?: number;
-          match_count?: number;
+          p_appointment_id: string;
+          p_new_datetime: string;
+          p_new_duration_minutes?: number;
+        };
+        Returns: boolean;
+      };
+      sign_patient_document: {
+        Args: { p_document_id: string; p_signed_data?: Json };
+        Returns: boolean;
+      };
+      update_appointment: {
+        Args: {
+          p_appointment_id: string;
+          p_appointment_datetime?: string;
+          p_duration_minutes?: number;
+          p_service_type?: string;
+          p_practitioner_name?: string;
+          p_location?: string;
+          p_notes?: string;
+          p_status?: string;
+          p_is_all_day?: boolean;
+          p_recurrence_rule?: string;
+        };
+        Returns: boolean;
+      };
+      update_appointment_sync_status: {
+        Args: {
+          p_appointment_id: string;
+          p_google_calendar_event_id?: string;
+          p_ics_uid?: string;
+        };
+        Returns: boolean;
+      };
+      update_patient: {
+        Args: {
+          p_id: string;
+          p_first_name?: string;
+          p_last_name?: string;
+          p_date_of_birth?: string;
+          p_sex?: string;
+          p_gender?: string;
+          p_address?: string;
+          p_phone_number?: string;
+          p_emergency_contact_name?: string;
+          p_emergency_contact_phone?: string;
+          p_preferred_language?: string;
+          p_ethnicity?: string;
+          p_race?: string;
+          p_is_active?: boolean;
         };
         Returns: {
+          address_line1: string | null;
+          address_line2: string | null;
+          branch: string | null;
+          city: string | null;
+          created_at: string;
+          date_of_birth: string;
+          email: string | null;
+          ethnicity: string | null;
+          first_name: string;
+          gender: string | null;
           id: string;
-          document_id: string;
-          chunk_index: number;
-          chunk_text: string;
-          similarity: number;
-          document_title: string;
-          document_status: string;
-          metadata: Json;
+          is_active: boolean;
+          last_name: string;
+          marital_status: string | null;
+          middle_name: string | null;
+          mobile_phone_number: string | null;
+          patient_status_id: number | null;
+          phone_number: string | null;
+          preferred_contact_method: string | null;
+          preferred_language: string | null;
+          preferred_name: string | null;
+          previous_name: string | null;
+          profile_id: string | null;
+          race: string | null;
+          social_security_number: string | null;
+          state: string | null;
+          suffix: string | null;
+          updated_at: string;
+          zip_code: string | null;
         }[];
       };
-      pg_query: {
-        Args: { sql_query: string };
-        Returns: Json;
+      update_patient_document: {
+        Args: {
+          p_document_id: string;
+          p_document_name?: string;
+          p_document_type?: string;
+          p_description?: string;
+          p_document_status?: string;
+          p_requires_signature?: boolean;
+          p_metadata?: Json;
+        };
+        Returns: boolean;
+      };
+      upload_patient_document: {
+        Args: {
+          p_patient_id: string;
+          p_document_name: string;
+          p_document_type_text: string;
+          p_file_storage_path: string;
+          p_file_mime_type: string;
+          p_file_size: number;
+          p_original_filename: string;
+          p_description?: string;
+          p_requires_signature?: boolean;
+          p_document_status_text?: string;
+          p_metadata?: Json;
+        };
+        Returns: string;
+      };
+      version_patient_document: {
+        Args: {
+          p_document_id: string;
+          p_new_file_storage_path: string;
+          p_new_file_mime_type?: string;
+          p_new_file_size?: number;
+          p_new_original_filename?: string;
+        };
+        Returns: string;
       };
     };
     Enums: {
+      appointment_status:
+        | 'scheduled'
+        | 'confirmed'
+        | 'completed'
+        | 'cancelled'
+        | 'no_show'
+        | 'rescheduled';
+      credential_status_enum:
+        | 'active'
+        | 'expired'
+        | 'pending_verification'
+        | 'verified'
+        | 'rejected'
+        | 'revoked';
+      credential_type_enum: 'License' | 'Certification' | 'Immunization' | 'Training' | 'Other';
+      document_status: 'draft' | 'pending_signature' | 'signed' | 'archived' | 'rejected';
+      document_type:
+        | 'admission_form'
+        | 'consent_form'
+        | 'medical_record'
+        | 'insurance_card'
+        | 'identification'
+        | 'advance_directive'
+        | 'care_plan'
+        | 'assessment'
+        | 'progress_note'
+        | 'other';
+      document_type_enum:
+        | 'contract'
+        | 'policy'
+        | 'onboarding_form'
+        | 'id_verification'
+        | 'medical_record'
+        | 'performance_review'
+        | 'other';
+      onboarding_status_enum: 'pending' | 'in_progress' | 'completed' | 'deferred';
+      onboarding_task_status_enum:
+        | 'pending'
+        | 'in_progress'
+        | 'completed'
+        | 'requires_attention'
+        | 'skipped';
       user_role:
+        | 'admin'
+        | 'staff'
+        | 'patient'
+        | 'family_contact'
         | 'financial_admin'
         | 'clinician'
         | 'assistant'
         | 'hr_admin'
         | 'administrator'
         | 'hha'
-        | 'patient'
-        | 'family_contact'
         | 'case_manager'
         | 'referral_source'
-        | 'unassigned';
+        | 'unassigned'
+        | 'clinical_administrator';
     };
     CompositeTypes: {
       [_ in never]: never;
@@ -1015,20 +1302,73 @@ export type CompositeTypes<
   : never;
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
+      appointment_status: [
+        'scheduled',
+        'confirmed',
+        'completed',
+        'cancelled',
+        'no_show',
+        'rescheduled',
+      ],
+      credential_status_enum: [
+        'active',
+        'expired',
+        'pending_verification',
+        'verified',
+        'rejected',
+        'revoked',
+      ],
+      credential_type_enum: ['License', 'Certification', 'Immunization', 'Training', 'Other'],
+      document_status: ['draft', 'pending_signature', 'signed', 'archived', 'rejected'],
+      document_type: [
+        'admission_form',
+        'consent_form',
+        'medical_record',
+        'insurance_card',
+        'identification',
+        'advance_directive',
+        'care_plan',
+        'assessment',
+        'progress_note',
+        'other',
+      ],
+      document_type_enum: [
+        'contract',
+        'policy',
+        'onboarding_form',
+        'id_verification',
+        'medical_record',
+        'performance_review',
+        'other',
+      ],
+      onboarding_status_enum: ['pending', 'in_progress', 'completed', 'deferred'],
+      onboarding_task_status_enum: [
+        'pending',
+        'in_progress',
+        'completed',
+        'requires_attention',
+        'skipped',
+      ],
       user_role: [
+        'admin',
+        'staff',
+        'patient',
+        'family_contact',
         'financial_admin',
         'clinician',
         'assistant',
         'hr_admin',
         'administrator',
         'hha',
-        'patient',
-        'family_contact',
         'case_manager',
         'referral_source',
         'unassigned',
+        'clinical_administrator',
       ],
     },
   },

@@ -13,7 +13,10 @@ import type { Database } from '../types/supabase';
 import { createClientComponentSupabase } from '@/lib/supabase/client';
 import { logoutUser } from '@/app/actions';
 
-type Profile = Database['public']['Tables']['profiles']['Row'];
+type Profile = Database['public']['Tables']['profiles']['Row'] & {
+  employment_start_date?: string | null;
+  avatar_url?: string | null;
+};
 
 interface AuthContextType {
   user: User | null;
@@ -74,78 +77,38 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
 
       console.log(`[fetchProfile] Fetching profile for user: ${userId}`);
+      setProfileLoaded(false); // Reset before fetching
 
       try {
-        // First try direct fetch from profiles table - simpler approach to make sure it works
-        console.log('[fetchProfile] Attempting direct fetch...');
+        console.log('[fetchProfile] Attempting direct fetch by id...');
         const { data: directData, error: directError } = await supabase
           .from('profiles')
           .select('*')
-          .eq('id', userId)
+          .eq('id', userId) // Query by id (matches auth.users.id)
           .single();
 
         if (directError) {
           if (directError.code === 'PGRST116') {
-            // No profile found via direct query
-            console.log('[fetchProfile] No profile found via direct query');
-
-            // Attempt to create a profile if it doesn't exist
-            console.log('[fetchProfile] Attempting to create a new profile...');
-            try {
-              const { error: insertError } = await supabase.from('profiles').insert({
-                id: userId,
-                first_name: '',
-                last_name: '',
-                role: 'unassigned',
-                updated_at: new Date().toISOString(),
-              });
-
-              if (insertError) {
-                console.error('[fetchProfile] Error creating profile:', insertError);
-                setError('Failed to create user profile. Please contact support.');
-                setProfile(null);
-              } else {
-                console.log('[fetchProfile] Profile created successfully, fetching new profile...');
-
-                // Fetch the newly created profile after a short delay to allow for db propagation
-                setTimeout(async () => {
-                  const { data: newProfile, error: fetchError } = await supabase
-                    .from('profiles')
-                    .select('*')
-                    .eq('id', userId)
-                    .single();
-
-                  if (fetchError) {
-                    console.error('[fetchProfile] Error fetching new profile:', fetchError);
-                    setProfile(null);
-                  } else {
-                    console.log('[fetchProfile] New profile fetched:', newProfile);
-                    setProfile(newProfile);
-                  }
-                  setProfileLoaded(true);
-                }, 500);
-                return; // Exit early as we're handling the profile loaded state in the timeout
-              }
-            } catch (createErr) {
-              console.error('[fetchProfile] Exception creating profile:', createErr);
-              setError(
-                `Error creating profile: ${
-                  createErr instanceof Error ? createErr.message : 'Unknown error'
-                }`
-              );
-              setProfile(null);
-            }
+            // No profile found via direct query - this might indicate an issue with the trigger or replication delay
+            console.warn(
+              `[fetchProfile] No profile found for id: ${userId}. The backend trigger should have created one.`
+            );
+            setProfile(null); // Set profile to null as it was not found
+            // setError('User profile not found. Please try refreshing or contact support if the issue persists.'); // Optional: inform user
           } else {
+            // Other unexpected error during fetch
             console.error('[fetchProfile] Direct fetch error:', directError);
             setError(`Failed to fetch profile: ${directError.message}`);
             setProfile(null);
           }
         } else if (directData) {
-          console.log('[fetchProfile] Profile fetched via direct access:', directData);
-          setProfile(directData);
+          console.log('[fetchProfile] Profile fetched via id:', directData);
+          setProfile(directData as Profile); // Explicitly cast to Profile type
         } else {
-          // If we get here, no profile was found via either method
-          console.warn('[fetchProfile] No profile found for user');
+          // Should not happen if .single() is used and no error, but as a fallback
+          console.warn(
+            `[fetchProfile] No profile data returned for id: ${userId}, though no error was thrown.`
+          );
           setProfile(null);
         }
       } catch (err) {
@@ -157,8 +120,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         );
         setProfile(null); // Reset profile on error
       } finally {
-        // Always mark profile as loaded unless we exited early
-        setProfileLoaded(true);
+        setProfileLoaded(true); // Always mark profile as loaded
       }
     },
     [supabase]

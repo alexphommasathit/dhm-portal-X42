@@ -204,8 +204,8 @@ serve(async (req: Request) => {
           details: errorDetails.join('; '),
         }),
         {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
       );
     }

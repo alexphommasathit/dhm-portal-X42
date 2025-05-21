@@ -16,6 +16,10 @@ import {
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
+import { Input } from '@/components/ui/input';
+
+// Placeholder background image URL - replace with your desired image
+const BACKGROUND_IMAGE_URL = '/images/login_background.jpeg';
 
 export default function LoginPage() {
   const [loadingEmail, setLoadingEmail] = useState(false);
@@ -107,108 +111,125 @@ export default function LoginPage() {
   };
 
   return (
-    <Card className="w-full max-w-md mx-auto">
-      <CardHeader>
-        <CardTitle className="text-center">Sign In</CardTitle>
-        <CardDescription className="text-center">
-          Sign in using your Google account or email
-        </CardDescription>
-      </CardHeader>
+    <div
+      className="min-h-screen flex flex-col items-center justify-center bg-cover bg-center p-4"
+      style={{ backgroundImage: `url(${BACKGROUND_IMAGE_URL})` }}
+    >
+      <Card className="w-full max-w-md bg-background/90 backdrop-blur-sm animate-fade-in-up">
+        <CardHeader>
+          <CardTitle className="text-2xl font-bold text-center text-foreground">Login</CardTitle>
+          <CardDescription className="text-center text-muted-foreground">
+            Welcome back! Please enter your details.
+          </CardDescription>
+        </CardHeader>
 
-      <CardContent className="space-y-4">
-        {fromPath && (
-          <div className="mb-4 p-3 text-sm text-blue-700 bg-blue-50 rounded-md">
-            You&apos;ll be redirected to <code className="font-mono text-xs">{fromPath}</code> after
-            login.
-          </div>
-        )}
-
-        {/* --- Google Login Button --- */}
-        <Button
-          variant="outline"
-          className="w-full"
-          onClick={handleGoogleLogin}
-          disabled={loadingGoogle || loadingEmail}
-        >
-          {loadingGoogle ? (
-            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-          ) : (
-            <span>Sign in with Google</span>
-          )}
-        </Button>
-
-        <div className="relative my-4">
-          {' '}
-          {/* Added margin */}
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t" />
-          </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
-          </div>
-        </div>
-
-        {/* --- Email/Password Form --- */}
-        <form onSubmit={handleEmailSubmit} className="space-y-4">
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-              Email address
-            </label>
-            <input
-              id="email"
-              name="email"
-              type="email"
-              autoComplete="email"
-              required
-              className="block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-primary-500"
-              disabled={loadingGoogle || loadingEmail}
-            />
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between">
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
-                Password
-              </label>
-              <Link
-                href="/auth/reset-password"
-                className="text-xs text-blue-600 hover:text-blue-800"
-              >
-                Forgot password?
-              </Link>
+        <CardContent className="space-y-6">
+          {fromPath && (
+            <div className="p-3 text-sm text-blue-700 bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 rounded-md">
+              You&apos;ll be redirected to <code className="font-mono text-xs">{fromPath}</code>{' '}
+              after login.
             </div>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              autoComplete="current-password"
-              required
-              className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 focus:border-primary-500 focus:outline-none focus:ring-primary-500"
-              disabled={loadingGoogle || loadingEmail}
-            />
-          </div>
+          )}
 
-          <Button type="submit" className="w-full" disabled={loadingGoogle || loadingEmail}>
-            {loadingEmail ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Signing in...
-              </>
+          <Button
+            variant="outline"
+            className="w-full py-3 text-base border-border hover:bg-muted/50 transition-colors duration-300"
+            onClick={handleGoogleLogin}
+            disabled={loadingGoogle || loadingEmail}
+          >
+            {loadingGoogle ? (
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
             ) : (
-              'Sign in with Email'
+              <span> G Sign in with Google</span>
             )}
           </Button>
-        </form>
-      </CardContent>
 
-      <CardFooter className="flex justify-center">
-        <div className="text-sm">
-          Don&apos;t have an account?{' '}
-          <Link href="/" className="font-medium text-blue-600 hover:text-blue-800">
-            Sign up
-          </Link>
-        </div>
-      </CardFooter>
-    </Card>
+          <div className="relative my-6">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-border" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-background/90 px-2 text-muted-foreground">
+                Or continue with email
+              </span>
+            </div>
+          </div>
+
+          <form onSubmit={handleEmailSubmit} className="space-y-6">
+            <div>
+              <label
+                htmlFor="email"
+                className="block text-sm font-medium text-muted-foreground mb-1"
+              >
+                Email address
+              </label>
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                autoComplete="email"
+                required
+                className="py-3 text-base"
+                disabled={loadingGoogle || loadingEmail}
+                placeholder="you@example.com"
+              />
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label
+                  htmlFor="password"
+                  className="block text-sm font-medium text-muted-foreground"
+                >
+                  Password
+                </label>
+                <Link href="/auth/reset-password" className="text-xs text-primary hover:underline">
+                  Forgot password?
+                </Link>
+              </div>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                autoComplete="current-password"
+                required
+                className="py-3 text-base"
+                disabled={loadingGoogle || loadingEmail}
+                placeholder="••••••••"
+              />
+            </div>
+
+            <Button
+              type="submit"
+              className="w-full py-3 text-base"
+              disabled={loadingGoogle || loadingEmail}
+            >
+              {loadingEmail ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Signing in...
+                </>
+              ) : (
+                'Sign in with Email'
+              )}
+            </Button>
+          </form>
+        </CardContent>
+
+        <CardFooter className="flex flex-col items-center justify-center space-y-2 pt-6">
+          <div className="text-sm text-muted-foreground">
+            Don&apos;t have an account?{' '}
+            <Link href="/" className="font-medium text-primary hover:underline">
+              Sign up
+            </Link>
+          </div>
+          <div className="text-xs text-muted-foreground/70">
+            <Link href="/" className="hover:underline">
+              Back to homepage
+            </Link>
+          </div>
+        </CardFooter>
+      </Card>
+    </div>
   );
 }

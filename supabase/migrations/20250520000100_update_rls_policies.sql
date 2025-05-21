@@ -7,7 +7,7 @@ DROP POLICY IF EXISTS "Users cannot delete profiles" ON public.profiles;
 CREATE POLICY "Users can view their own profile"
   ON public.profiles
   FOR SELECT
-  USING (id = auth.uid());
+  USING (user_id = auth.uid());
 
 -- Disable RLS temporarily to modify policies
 ALTER TABLE public.profiles DISABLE ROW LEVEL SECURITY;
@@ -32,16 +32,16 @@ CREATE POLICY "Users cannot delete profiles"
 CREATE POLICY "Users can update limited profile fields"
   ON public.profiles
   FOR UPDATE
-  USING (auth.uid() = id)
+  USING (auth.uid() = user_id)
   WITH CHECK (
-    id = auth.uid() AND -- Ensure user is updating their own profile
+    user_id = auth.uid() AND -- Ensure user is updating their own profile
     (
       -- Fields that cannot be changed
-      id = (SELECT id FROM public.profiles WHERE id = auth.uid()) AND
-      email = (SELECT email FROM public.profiles WHERE id = auth.uid()) AND
-      role = (SELECT role FROM public.profiles WHERE id = auth.uid()) AND
-      job_title = (SELECT job_title FROM public.profiles WHERE id = auth.uid()) AND
-      created_at = (SELECT created_at FROM public.profiles WHERE id = auth.uid())
+      id = (SELECT id FROM public.profiles WHERE user_id = auth.uid()) AND
+      email = (SELECT email FROM public.profiles WHERE user_id = auth.uid()) AND
+      role = (SELECT role FROM public.profiles WHERE user_id = auth.uid()) AND
+      job_title = (SELECT job_title FROM public.profiles WHERE user_id = auth.uid()) AND
+      created_at = (SELECT created_at FROM public.profiles WHERE user_id = auth.uid())
       -- Fields that can be changed are implicitly allowed
     )
   );

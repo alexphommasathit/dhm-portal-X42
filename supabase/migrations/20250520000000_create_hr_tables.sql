@@ -143,14 +143,14 @@ CREATE POLICY "HR can view all profiles"
     FOR SELECT
     USING ((EXISTS ( SELECT 1
    FROM public.profiles hr_profile
-  WHERE ((hr_profile.id = auth.uid()) AND (hr_profile.role = ANY (ARRAY['administrator'::public.user_role, 'hr_admin'::public.user_role, 'assistant'::public.user_role]))))));
+  WHERE ((hr_profile.user_id = auth.uid()) AND (hr_profile.role = ANY (ARRAY['administrator'::public.user_role, 'hr_admin'::public.user_role, 'assistant'::public.user_role]))))));
 
 -- Policy: Employees can SELECT their own profile
 DROP POLICY IF EXISTS "Users can view their own profile" ON public.profiles; -- Recreate existing policy
 CREATE POLICY "Users can view their own profile"
     ON public.profiles
     FOR SELECT
-    USING ((id = auth.uid())); -- Using the correct 'id' column
+    USING ((user_id = auth.uid())); -- Using the correct 'user_id' column
 
 -- Policy: HR roles can INSERT profiles (e.g., via invite)
 DROP POLICY IF EXISTS "HR can insert profiles" ON public.profiles;
@@ -159,14 +159,14 @@ CREATE POLICY "HR can insert profiles"
     FOR INSERT
     WITH CHECK ((EXISTS ( SELECT 1
    FROM public.profiles hr_profile
-  WHERE ((hr_profile.id = auth.uid()) AND (hr_profile.role = ANY (ARRAY['administrator'::public.user_role, 'hr_admin'::public.user_role, 'assistant'::public.user_role]))))));
+  WHERE ((hr_profile.user_id = auth.uid()) AND (hr_profile.role = ANY (ARRAY['administrator'::public.user_role, 'hr_admin'::public.user_role, 'assistant'::public.user_role]))))));
 
 -- Policy: Employees can UPDATE their own profile (specific fields)
 DROP POLICY IF EXISTS "Users can update their own profile" ON public.profiles; -- Recreate existing policy
 CREATE POLICY "Users can update their own profile"
     ON public.profiles
     FOR UPDATE
-    USING ((id = auth.uid())); -- Using the correct 'id' column
+    USING ((user_id = auth.uid())); -- Using the correct 'user_id' column
     -- Optional WITH CHECK to restrict which columns they can update, e.g.:
     -- WITH CHECK (
     --     id = OLD.id AND email = OLD.email AND role = OLD.role AND created_at = OLD.created_at
@@ -180,7 +180,7 @@ CREATE POLICY "HR can update all profiles"
     FOR UPDATE
     USING ((EXISTS ( SELECT 1
    FROM public.profiles hr_profile
-  WHERE ((hr_profile.id = auth.uid()) AND (hr_profile.role = ANY (ARRAY['administrator'::public.user_role, 'hr_admin'::public.user_role, 'assistant'::public.user_role]))))));
+  WHERE ((hr_profile.user_id = auth.uid()) AND (hr_profile.role = ANY (ARRAY['administrator'::public.user_role, 'hr_admin'::public.user_role, 'assistant'::public.user_role]))))));
 
 
 -- RLS for public.credentials
@@ -193,16 +193,16 @@ CREATE POLICY "HR can manage all credentials"
     FOR ALL -- Applies to SELECT, INSERT, UPDATE, DELETE
     USING ((EXISTS ( SELECT 1
    FROM public.profiles hr_profile
-  WHERE ((hr_profile.id = auth.uid()) AND (hr_profile.role = ANY (ARRAY['administrator'::public.user_role, 'hr_admin'::public.user_role, 'assistant'::public.user_role])))))); -- Using the same condition for all operations
+  WHERE ((hr_profile.user_id = auth.uid()) AND (hr_profile.role = ANY (ARRAY['administrator'::public.user_role, 'hr_admin'::public.user_role, 'assistant'::public.user_role])))))); -- Using the same condition for all operations
     -- For INSERT/UPDATE, the WITH CHECK would be the same if you want to enforce that HR can only *create/update* valid records, but USING is often sufficient for HR full access.
-    -- WITH CHECK ((EXISTS ( SELECT 1 FROM public.profiles hr_profile WHERE ((hr_profile.id = auth.uid()) AND (hr_profile.role = ANY (ARRAY['administrator'::public.user_role, 'hr_admin'::public.user_role, 'assistant'::public.user_role])))))) -- Redundant if USING is the same
+    -- WITH CHECK ((EXISTS ( SELECT 1 FROM public.profiles hr_profile WHERE ((hr_profile.user_id = auth.uid()) AND (hr_profile.role = ANY (ARRAY['administrator'::public.user_role, 'hr_admin'::public.user_role, 'assistant'::public.user_role])))))) -- Redundant if USING is the same
 
 -- Policy: Employees can SELECT their own credentials
 DROP POLICY IF EXISTS "Employees can view their own credentials" ON public.credentials;
 CREATE POLICY "Employees can view their own credentials"
     ON public.credentials
     FOR SELECT
-    USING ((employee_id = auth.uid()));
+    USING ((EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = employee_id AND p.user_id = auth.uid())));
 
 
 -- RLS for public.employee_documents
@@ -215,14 +215,14 @@ CREATE POLICY "HR can manage all employee documents"
     FOR ALL -- Applies to SELECT, INSERT, UPDATE, DELETE
     USING ((EXISTS ( SELECT 1
    FROM public.profiles hr_profile
-  WHERE ((hr_profile.id = auth.uid()) AND (hr_profile.role = ANY (ARRAY['administrator'::public.user_role, 'hr_admin'::public.user_role, 'assistant'::public.user_role]))))));
+  WHERE ((hr_profile.user_id = auth.uid()) AND (hr_profile.role = ANY (ARRAY['administrator'::public.user_role, 'hr_admin'::public.user_role, 'assistant'::public.user_role]))))));
 
 -- Policy: Employees can SELECT their own documents (filtered by type)
 DROP POLICY IF EXISTS "Employees can view certain own documents" ON public.employee_documents;
 CREATE POLICY "Employees can view certain own documents"
     ON public.employee_documents
     FOR SELECT
-    USING ((employee_id = auth.uid() AND document_type = ANY (ARRAY['contract'::public.document_type_enum, 'policy'::public.document_type_enum, 'onboarding_form'::public.document_type_enum]))); -- Adjust the list of allowed types as needed
+    USING ((EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = employee_id AND p.user_id = auth.uid())) AND document_type = ANY (ARRAY['contract'::public.document_type_enum, 'policy'::public.document_type_enum, 'onboarding_form'::public.document_type_enum])); -- Adjust the list of allowed types as needed
 
 
 -- RLS for public.onboarding_tasks
@@ -235,21 +235,38 @@ CREATE POLICY "HR can manage all onboarding tasks"
     FOR ALL -- Applies to SELECT, INSERT, UPDATE, DELETE
     USING ((EXISTS ( SELECT 1
    FROM public.profiles hr_profile
-  WHERE ((hr_profile.id = auth.uid()) AND (hr_profile.role = ANY (ARRAY['administrator'::public.user_role, 'hr_admin'::public.user_role, 'assistant'::public.user_role]))))));
+  WHERE ((hr_profile.user_id = auth.uid()) AND (hr_profile.role = ANY (ARRAY['administrator'::public.user_role, 'hr_admin'::public.user_role, 'assistant'::public.user_role]))))));
 
 -- Policy: Employees can SELECT their own onboarding tasks
 DROP POLICY IF EXISTS "Employees can view their own onboarding tasks" ON public.onboarding_tasks;
 CREATE POLICY "Employees can view their own onboarding tasks"
     ON public.onboarding_tasks
     FOR SELECT
-    USING ((employee_id = auth.uid()));
+    USING ((EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = employee_id AND p.user_id = auth.uid())));
 
 -- Policy: Employees can UPDATE status and notes on tasks assigned to them
 DROP POLICY IF EXISTS "Employees can update status and notes on assigned tasks" ON public.onboarding_tasks;
 CREATE POLICY "Employees can update status and notes on assigned tasks"
     ON public.onboarding_tasks
     FOR UPDATE
-    USING (
-        employee_id = auth.uid() AND -- It's a task for this employee
-        assigned_to_role = (SELECT role FROM public.profiles WHERE id = auth.uid()) -- And the task is assigned to the user's specific role
-    );
+    USING ((EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = employee_id AND p.user_id = auth.uid())))
+    WITH CHECK ((EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = employee_id AND p.user_id = auth.uid())) AND status = NEW.status AND notes = NEW.notes); -- Assuming only status and notes can be changed by employee.
+
+-- ==============================
+-- 5. Add Triggers for updated_at
+-- ==============================
+
+-- Trigger for public.credentials
+CREATE TRIGGER on_credentials_updated
+  BEFORE UPDATE ON public.credentials
+  FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+-- Trigger for public.employee_documents
+CREATE TRIGGER on_employee_documents_updated
+  BEFORE UPDATE ON public.employee_documents
+  FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
+
+-- Trigger for public.onboarding_tasks
+CREATE TRIGGER on_onboarding_tasks_updated
+  BEFORE UPDATE ON public.onboarding_tasks
+  FOR EACH ROW EXECUTE FUNCTION public.handle_updated_at();
