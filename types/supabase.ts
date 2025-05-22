@@ -7,31 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          operationName?: string
-          query?: string
-          variables?: Json
-          extensions?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       appointments: {
@@ -112,6 +87,99 @@ export type Database = {
           },
         ]
       }
+      credentials: {
+        Row: {
+          created_at: string
+          credential_name: string
+          credential_number: string | null
+          credential_type: Database["public"]["Enums"]["credential_type_enum"]
+          document_file_path: string | null
+          document_id: string | null
+          employee_id: string
+          expiry_date: string | null
+          id: string
+          issue_date: string | null
+          issuing_body: string | null
+          status: Database["public"]["Enums"]["credential_status_enum"]
+          updated_at: string
+          verified_at: string | null
+          verified_by_user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          credential_name: string
+          credential_number?: string | null
+          credential_type: Database["public"]["Enums"]["credential_type_enum"]
+          document_file_path?: string | null
+          document_id?: string | null
+          employee_id: string
+          expiry_date?: string | null
+          id?: string
+          issue_date?: string | null
+          issuing_body?: string | null
+          status?: Database["public"]["Enums"]["credential_status_enum"]
+          updated_at?: string
+          verified_at?: string | null
+          verified_by_user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          credential_name?: string
+          credential_number?: string | null
+          credential_type?: Database["public"]["Enums"]["credential_type_enum"]
+          document_file_path?: string | null
+          document_id?: string | null
+          employee_id?: string
+          expiry_date?: string | null
+          id?: string
+          issue_date?: string | null
+          issuing_body?: string | null
+          status?: Database["public"]["Enums"]["credential_status_enum"]
+          updated_at?: string
+          verified_at?: string | null
+          verified_by_user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "credentials_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "employee_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "credentials_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      departments: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       document_templates: {
         Row: {
           created_at: string
@@ -161,6 +229,203 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_documents: {
+        Row: {
+          created_at: string
+          document_name: string
+          document_type: Database["public"]["Enums"]["document_type_enum"]
+          document_type_tag: string | null
+          employee_id: string
+          employee_task_id: string | null
+          file_path: string
+          id: string
+          status: string | null
+          updated_at: string
+          uploaded_at: string | null
+          uploaded_by_user_id: string
+        }
+        Insert: {
+          created_at?: string
+          document_name: string
+          document_type: Database["public"]["Enums"]["document_type_enum"]
+          document_type_tag?: string | null
+          employee_id: string
+          employee_task_id?: string | null
+          file_path: string
+          id?: string
+          status?: string | null
+          updated_at?: string
+          uploaded_at?: string | null
+          uploaded_by_user_id: string
+        }
+        Update: {
+          created_at?: string
+          document_name?: string
+          document_type?: Database["public"]["Enums"]["document_type_enum"]
+          document_type_tag?: string | null
+          employee_id?: string
+          employee_task_id?: string | null
+          file_path?: string
+          id?: string
+          status?: string | null
+          updated_at?: string
+          uploaded_at?: string | null
+          uploaded_by_user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_documents_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_documents_employee_task_id_fkey"
+            columns: ["employee_task_id"]
+            isOneToOne: false
+            referencedRelation: "employee_tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_tasks: {
+        Row: {
+          assigned_to_user_id: string | null
+          completed_at: string | null
+          created_at: string
+          due_date: string | null
+          employee_id: string
+          employee_workflow_assignment_id: string | null
+          id: string
+          notes: string | null
+          status: Database["public"]["Enums"]["employee_task_status_enum"]
+          submitted_data_json: Json | null
+          task_definition_id: string | null
+          task_description_override: string | null
+          task_name_override: string
+          updated_at: string
+        }
+        Insert: {
+          assigned_to_user_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          due_date?: string | null
+          employee_id: string
+          employee_workflow_assignment_id?: string | null
+          id?: string
+          notes?: string | null
+          status?: Database["public"]["Enums"]["employee_task_status_enum"]
+          submitted_data_json?: Json | null
+          task_definition_id?: string | null
+          task_description_override?: string | null
+          task_name_override: string
+          updated_at?: string
+        }
+        Update: {
+          assigned_to_user_id?: string | null
+          completed_at?: string | null
+          created_at?: string
+          due_date?: string | null
+          employee_id?: string
+          employee_workflow_assignment_id?: string | null
+          id?: string
+          notes?: string | null
+          status?: Database["public"]["Enums"]["employee_task_status_enum"]
+          submitted_data_json?: Json | null
+          task_definition_id?: string | null
+          task_description_override?: string | null
+          task_name_override?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_tasks_assigned_to_user_id_fkey"
+            columns: ["assigned_to_user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_tasks_employee_workflow_assignment_id_fkey"
+            columns: ["employee_workflow_assignment_id"]
+            isOneToOne: false
+            referencedRelation: "employee_workflow_assignments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_tasks_task_definition_id_fkey"
+            columns: ["task_definition_id"]
+            isOneToOne: false
+            referencedRelation: "task_definitions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "onboarding_tasks_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_workflow_assignments: {
+        Row: {
+          assigned_date: string | null
+          completed_date: string | null
+          created_at: string | null
+          due_date: string | null
+          employee_id: string | null
+          id: string
+          status:
+            | Database["public"]["Enums"]["employee_workflow_status_enum"]
+            | null
+          updated_at: string | null
+          workflow_template_id: string | null
+        }
+        Insert: {
+          assigned_date?: string | null
+          completed_date?: string | null
+          created_at?: string | null
+          due_date?: string | null
+          employee_id?: string | null
+          id?: string
+          status?:
+            | Database["public"]["Enums"]["employee_workflow_status_enum"]
+            | null
+          updated_at?: string | null
+          workflow_template_id?: string | null
+        }
+        Update: {
+          assigned_date?: string | null
+          completed_date?: string | null
+          created_at?: string | null
+          due_date?: string | null
+          employee_id?: string | null
+          id?: string
+          status?:
+            | Database["public"]["Enums"]["employee_workflow_status_enum"]
+            | null
+          updated_at?: string | null
+          workflow_template_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_workflow_assignments_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_workflow_assignments_workflow_template_id_fkey"
+            columns: ["workflow_template_id"]
+            isOneToOne: false
+            referencedRelation: "workflow_templates"
             referencedColumns: ["id"]
           },
         ]
@@ -413,6 +678,7 @@ export type Database = {
           marital_status: string | null
           middle_name: string | null
           mobile_phone_number: string | null
+          patient_status_id: number | null
           phone_number: string | null
           preferred_contact_method: string | null
           preferred_language: string | null
@@ -443,6 +709,7 @@ export type Database = {
           marital_status?: string | null
           middle_name?: string | null
           mobile_phone_number?: string | null
+          patient_status_id?: number | null
           phone_number?: string | null
           preferred_contact_method?: string | null
           preferred_language?: string | null
@@ -473,6 +740,7 @@ export type Database = {
           marital_status?: string | null
           middle_name?: string | null
           mobile_phone_number?: string | null
+          patient_status_id?: number | null
           phone_number?: string | null
           preferred_contact_method?: string | null
           preferred_language?: string | null
@@ -488,6 +756,13 @@ export type Database = {
         }
         Relationships: [
           {
+            foreignKeyName: "patients_patient_status_id_fkey"
+            columns: ["patient_status_id"]
+            isOneToOne: false
+            referencedRelation: "patient_statuses"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "patients_profile_id_fkey"
             columns: ["profile_id"]
             isOneToOne: true
@@ -498,84 +773,139 @@ export type Database = {
       }
       profiles: {
         Row: {
+          birthdate: string | null
           created_at: string
+          department_id: string | null
           email: string
           first_name: string
+          full_name: string | null
+          gender: string | null
+          hire_date: string | null
           id: string
           job_title: string | null
           last_name: string
-          phone_number: string | null
+          manager_id: string | null
           role: Database["public"]["Enums"]["user_role"]
           updated_at: string
           user_id: string | null
         }
         Insert: {
+          birthdate?: string | null
           created_at?: string
+          department_id?: string | null
           email: string
           first_name: string
+          full_name?: string | null
+          gender?: string | null
+          hire_date?: string | null
           id?: string
           job_title?: string | null
           last_name: string
-          phone_number?: string | null
-          role: Database["public"]["Enums"]["user_role"]
-          updated_at?: string
-          user_id?: string | null
-        }
-        Update: {
-          created_at?: string
-          email?: string
-          first_name?: string
-          id?: string
-          job_title?: string | null
-          last_name?: string
-          phone_number?: string | null
+          manager_id?: string | null
           role?: Database["public"]["Enums"]["user_role"]
           updated_at?: string
           user_id?: string | null
         }
-        Relationships: []
+        Update: {
+          birthdate?: string | null
+          created_at?: string
+          department_id?: string | null
+          email?: string
+          first_name?: string
+          full_name?: string | null
+          gender?: string | null
+          hire_date?: string | null
+          id?: string
+          job_title?: string | null
+          last_name?: string
+          manager_id?: string | null
+          role?: Database["public"]["Enums"]["user_role"]
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
-      task_templates: {
+      task_definitions: {
         Row: {
           created_at: string | null
+          default_assignee_type:
+            | Database["public"]["Enums"]["assignee_type_enum"]
+            | null
           description: string | null
-          is_required: boolean | null
+          document_template_id: string | null
+          document_template_url: string | null
+          form_schema_json: Json | null
+          id: string
           name: string
-          relevant_policy_chunk_ids: string[] | null
-          step_number: number
-          task_template_id: string
+          order_in_workflow: number
+          success_criteria: string | null
+          task_type: Database["public"]["Enums"]["task_type_enum"] | null
           updated_at: string | null
           workflow_template_id: string
         }
         Insert: {
           created_at?: string | null
+          default_assignee_type?:
+            | Database["public"]["Enums"]["assignee_type_enum"]
+            | null
           description?: string | null
-          is_required?: boolean | null
+          document_template_id?: string | null
+          document_template_url?: string | null
+          form_schema_json?: Json | null
+          id?: string
           name: string
-          relevant_policy_chunk_ids?: string[] | null
-          step_number: number
-          task_template_id?: string
+          order_in_workflow: number
+          success_criteria?: string | null
+          task_type?: Database["public"]["Enums"]["task_type_enum"] | null
           updated_at?: string | null
           workflow_template_id: string
         }
         Update: {
           created_at?: string | null
+          default_assignee_type?:
+            | Database["public"]["Enums"]["assignee_type_enum"]
+            | null
           description?: string | null
-          is_required?: boolean | null
+          document_template_id?: string | null
+          document_template_url?: string | null
+          form_schema_json?: Json | null
+          id?: string
           name?: string
-          relevant_policy_chunk_ids?: string[] | null
-          step_number?: number
-          task_template_id?: string
+          order_in_workflow?: number
+          success_criteria?: string | null
+          task_type?: Database["public"]["Enums"]["task_type_enum"] | null
           updated_at?: string | null
           workflow_template_id?: string
         }
         Relationships: [
           {
+            foreignKeyName: "task_templates_document_template_id_fkey"
+            columns: ["document_template_id"]
+            isOneToOne: false
+            referencedRelation: "document_templates"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "task_templates_workflow_template_id_fkey"
             columns: ["workflow_template_id"]
             isOneToOne: false
             referencedRelation: "workflow_templates"
-            referencedColumns: ["template_id"]
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -583,23 +913,35 @@ export type Database = {
         Row: {
           created_at: string | null
           description: string | null
+          id: string
+          is_active: boolean | null
           name: string
-          template_id: string
           updated_at: string | null
+          workflow_type:
+            | Database["public"]["Enums"]["workflow_type_enum"]
+            | null
         }
         Insert: {
           created_at?: string | null
           description?: string | null
+          id?: string
+          is_active?: boolean | null
           name: string
-          template_id?: string
           updated_at?: string | null
+          workflow_type?:
+            | Database["public"]["Enums"]["workflow_type_enum"]
+            | null
         }
         Update: {
           created_at?: string | null
           description?: string | null
+          id?: string
+          is_active?: boolean | null
           name?: string
-          template_id?: string
           updated_at?: string | null
+          workflow_type?:
+            | Database["public"]["Enums"]["workflow_type_enum"]
+            | null
         }
         Relationships: []
       }
@@ -742,6 +1084,14 @@ export type Database = {
           status: string
         }[]
       }
+      get_my_profile_id: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      get_my_profile_role: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       get_patient_details: {
         Args: { p_patient_id: string }
         Returns: {
@@ -761,6 +1111,7 @@ export type Database = {
           marital_status: string | null
           middle_name: string | null
           mobile_phone_number: string | null
+          patient_status_id: number | null
           phone_number: string | null
           preferred_contact_method: string | null
           preferred_language: string | null
@@ -794,6 +1145,7 @@ export type Database = {
           marital_status: string | null
           middle_name: string | null
           mobile_phone_number: string | null
+          patient_status_id: number | null
           phone_number: string | null
           preferred_contact_method: string | null
           preferred_language: string | null
@@ -839,6 +1191,14 @@ export type Database = {
           p_expiry_days?: number
         }
         Returns: string
+      }
+      is_linked_family_contact_for_patient: {
+        Args: { p_patient_id: string; p_user_id: string }
+        Returns: boolean
+      }
+      is_my_manager: {
+        Args: { p_employee_id: string }
+        Returns: boolean
       }
       reschedule_appointment: {
         Args: {
@@ -909,6 +1269,7 @@ export type Database = {
           marital_status: string | null
           middle_name: string | null
           mobile_phone_number: string | null
+          patient_status_id: number | null
           phone_number: string | null
           preferred_contact_method: string | null
           preferred_language: string | null
@@ -970,6 +1331,20 @@ export type Database = {
         | "cancelled"
         | "no_show"
         | "rescheduled"
+      assignee_type_enum: "NEW_HIRE" | "HR_ADMIN" | "MANAGER" | "SYSTEM"
+      credential_status_enum:
+        | "active"
+        | "expired"
+        | "pending_verification"
+        | "verified"
+        | "rejected"
+        | "revoked"
+      credential_type_enum:
+        | "License"
+        | "Certification"
+        | "Immunization"
+        | "Training"
+        | "Other"
       document_status:
         | "draft"
         | "pending_signature"
@@ -987,6 +1362,43 @@ export type Database = {
         | "assessment"
         | "progress_note"
         | "other"
+      document_type_enum:
+        | "contract"
+        | "policy"
+        | "onboarding_form"
+        | "id_verification"
+        | "medical_record"
+        | "performance_review"
+        | "other"
+      employee_task_status_enum:
+        | "PENDING"
+        | "IN_PROGRESS"
+        | "SUBMITTED_FOR_REVIEW"
+        | "COMPLETED"
+        | "REJECTED"
+        | "CANCELLED"
+      employee_workflow_status_enum:
+        | "PENDING"
+        | "IN_PROGRESS"
+        | "COMPLETED"
+        | "CANCELLED"
+      onboarding_status_enum:
+        | "pending"
+        | "in_progress"
+        | "completed"
+        | "deferred"
+      onboarding_task_status_enum:
+        | "pending"
+        | "in_progress"
+        | "completed"
+        | "requires_attention"
+        | "skipped"
+      task_type_enum:
+        | "DOCUMENT_VIEW_SIGN"
+        | "FORM_FILL"
+        | "DOCUMENT_UPLOAD"
+        | "POLICY_ACKNOWLEDGEMENT"
+        | "HR_REVIEW"
       user_role:
         | "admin"
         | "staff"
@@ -1001,6 +1413,8 @@ export type Database = {
         | "case_manager"
         | "referral_source"
         | "unassigned"
+        | "clinical_administrator"
+      workflow_type_enum: "ONBOARDING" | "OFFBOARDING" | "PERFORMANCE_REVIEW"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1114,9 +1528,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       appointment_status: [
@@ -1126,6 +1537,22 @@ export const Constants = {
         "cancelled",
         "no_show",
         "rescheduled",
+      ],
+      assignee_type_enum: ["NEW_HIRE", "HR_ADMIN", "MANAGER", "SYSTEM"],
+      credential_status_enum: [
+        "active",
+        "expired",
+        "pending_verification",
+        "verified",
+        "rejected",
+        "revoked",
+      ],
+      credential_type_enum: [
+        "License",
+        "Certification",
+        "Immunization",
+        "Training",
+        "Other",
       ],
       document_status: [
         "draft",
@@ -1146,6 +1573,49 @@ export const Constants = {
         "progress_note",
         "other",
       ],
+      document_type_enum: [
+        "contract",
+        "policy",
+        "onboarding_form",
+        "id_verification",
+        "medical_record",
+        "performance_review",
+        "other",
+      ],
+      employee_task_status_enum: [
+        "PENDING",
+        "IN_PROGRESS",
+        "SUBMITTED_FOR_REVIEW",
+        "COMPLETED",
+        "REJECTED",
+        "CANCELLED",
+      ],
+      employee_workflow_status_enum: [
+        "PENDING",
+        "IN_PROGRESS",
+        "COMPLETED",
+        "CANCELLED",
+      ],
+      onboarding_status_enum: [
+        "pending",
+        "in_progress",
+        "completed",
+        "deferred",
+      ],
+      onboarding_task_status_enum: [
+        "pending",
+        "in_progress",
+        "completed",
+        "requires_attention",
+        "skipped",
+      ],
+      task_type_enum: [
+        "DOCUMENT_VIEW_SIGN",
+        "FORM_FILL",
+        "DOCUMENT_UPLOAD",
+        "POLICY_ACKNOWLEDGEMENT",
+        "HR_REVIEW",
+      ],
       user_role: [
         "admin",
         "staff",
@@ -1160,8 +1630,9 @@ export const Constants = {
         "case_manager",
         "referral_source",
         "unassigned",
+        "clinical_administrator",
       ],
+      workflow_type_enum: ["ONBOARDING", "OFFBOARDING", "PERFORMANCE_REVIEW"],
     },
   },
 } as const
-
